@@ -78,6 +78,11 @@
       margin: 0 auto;
     }
     
+    .card.large {
+      width: 320px;
+      height: 180px;
+    }
+    
     .card:hover {
       transform: translateY(-4px);
       box-shadow: var(--shadow-lg);
@@ -781,9 +786,16 @@
       const sequenceArea = document.getElementById('sequence-area');
       cardContainer.innerHTML = '';
       sequenceArea.innerHTML = '';
+
+      // List of surahs that should have larger cards
+      const largeCardSurahs = [98]; //al-Bayyinah
+
       const cards = surah.ayat.map((ayah, idx) => {
         const card = document.createElement('div');
         card.className = 'card';
+        if (largeCardSurahs.includes(parseInt(surahNum))) {
+          card.classList.add('large');
+        }
         card.setAttribute('draggable', 'true');
         card.dataset.verse = idx + 1;
         card.innerHTML = `
