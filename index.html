@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Quranic Flashcards - Surah Al-Ikhlas</title>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary: #64748b;
+      --background: #f8fafc;
+      --surface: #ffffff;
+      --text: #1e293b;
+      --text-light: #64748b;
+      --success: #22c55e;
+      --error: #ef4444;
+      --border: #e2e8f0;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Naskh Arabic', system-ui, sans-serif;
+      background-color: var(--background);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      line-height: 1.5;
+      letter-spacing: -0.025em;
+    }
+    
+    body.dark-mode {
+      --background: #0f172a;
+      --surface: #1e293b;
+      --text: #f8fafc;
+      --text-light: #94a3b8;
+      --border: #334155;
+    }
+    
+    .card-container {
+      display: grid;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding-bottom: 1rem;
+      overflow-x: auto;
+      align-items: start;
+      transition: all 0.3s ease;
+      grid-template-rows: repeat(4, 1fr);
+      grid-auto-flow: row;
+      font-family: 'Noto Naskh Arabic', serif;
+      grid-auto-columns: 320px;
+      justify-content: start;
+      box-sizing: border-box;
+      padding-right: 2rem;
+    }
+    
+    .card {
+      width: 260px;
+      height: 146px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      z-index: 1;
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin: 0 auto;
+    }
+    
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .card.selected {
+      transform: scale(1.05);
+      box-shadow: 0 0 0 3px var(--primary), var(--shadow-lg);
+      z-index: 2;
+    }
+    
+    .card:active {
+      cursor: grabbing;
+    }
+    
+    .card.flipped {
+      transform: rotateY(180deg);
+    }
+    
+    .card.dragging {
+      opacity: 0.8;
+      z-index: 100;
+    }
+    
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+    
+    .card-front {
+      background-color: var(--surface);
+      padding: 1.5rem;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .card-back {
+      background-color: var(--surface);
+      transform: rotateY(180deg);
+      border: 1px solid var(--border);
+    }
+    
+    .ayah-text {
+      font-size: clamp(16px, 1.6vw, 22px);
+      line-height: 1.4;
+      color: var(--text);
+      max-width: 100%;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      text-align: center;
+      white-space: normal;
+      padding: 0 1rem;
+      box-sizing: border-box;
+      font-family: 'Noto Naskh Arabic', serif;
+    }
+    
+    .pattern {
+      position: absolute;
+      width: 90%;
+      height: 90%;
+      border: 2px solid #8e6f3b;
+      border-radius: 10px;
+    }
+    
+    .pattern::before {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      border: 1px solid #8e6f3b;
+      border-radius: 5px;
+    }
+    
+    .pattern::after {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      background-image: radial-gradient(circle at center, #8e6f3b 2px, transparent 2px);
+      background-size: 15px 15px;
+      opacity: 0.3;
+    }
+    
+    .corner {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-color: #8e6f3b;
+      border-style: solid;
+      border-width: 0;
+    }
+    
+    .top-left {
+      top: 20px;
+      left: 20px;
+      border-top-width: 2px;
+      border-left-width: 2px;
+      border-top-left-radius: 8px;
+    }
+    
+    .top-right {
+      top: 20px;
+      right: 20px;
+      border-top-width: 2px;
+      border-right-width: 2px;
+      border-top-right-radius: 8px;
+    }
+    
+    .bottom-left {
+      bottom: 20px;
+      left: 20px;
+      border-bottom-width: 2px;
+      border-left-width: 2px;
+      border-bottom-left-radius: 8px;
+    }
+    
+    .bottom-right {
+      bottom: 20px;
+      right: 20px;
+      border-bottom-width: 2px;
+      border-right-width: 2px;
+      border-bottom-right-radius: 8px;
+    }
+    
+    .sequence-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 1200px;
+      margin: 2.5rem auto 0;
+      box-sizing: border-box;
+    }
+    
+    .sequence-title {
+      color: var(--text);
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    
+    .sequence-area {
+      display: grid;
+      grid-template-rows: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      grid-auto-flow: row;
+      justify-content: flex-end;
+      margin: 0 auto;
+      box-sizing: border-box;
+      align-items: start;
+      min-height: clamp(80px, 15vw, 120px);
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      overflow-x: auto;
+      width: 100%;
+      gap: 1rem;
+      transition: all 0.3s ease;
+      font-family: 'Noto Naskh Arabic', serif;
+      direction: rtl;
+      box-shadow: var(--shadow);
+    }
+    
+    .drop-zone {
+      min-width: 120px;
+      min-height: 80px;
+      width: 100%;
+      height: 100%;
+      border: 2px dashed var(--border);
+      border-radius: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-light);
+      font-size: 1.125rem;
+      transition: all 0.3s ease;
+      position: relative;
+      font-family: 'Noto Naskh Arabic', serif;
+      background: var(--background);
+    }
+    
+    .drop-zone:hover {
+      border-color: var(--primary);
+      background-color: rgba(37, 99, 235, 0.05);
+    }
+    
+    .drop-zone.selected {
+      background-color: rgba(37, 99, 235, 0.1);
+      border-color: var(--primary);
+    }
+    
+    .drop-zone.highlight {
+      background-color: rgba(37, 99, 235, 0.1);
+      border-color: var(--primary);
+    }
+    
+    .drop-zone.filled {
+      border: none;
+      background-color: transparent;
+    }
+    
+    .feedback-icon {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      font-size: 1.5rem;
+      z-index: 10;
+      display: none;
+    }
+    
+    .feedback-icon.correct {
+      color: var(--success);
+    }
+    
+    .feedback-icon.incorrect {
+      color: var(--error);
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      margin: 1.5rem 0 2.5rem;
+    }
+    
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      font-weight: 500;
+      border-radius: 0.75rem;
+      transition: all 0.2s ease;
+      background: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: var(--shadow);
+    }
+    
+    button:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-lg);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .check-answer {
+      background-color: var(--success);
+    }
+    
+    .check-answer:hover {
+      background-color: #16a34a;
+    }
+    
+    #surah-selector {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      background-size: 1.5em 1.5em;
+      padding: 0.75rem 2.5rem 0.75rem 1rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      background-color: var(--surface);
+      font-size: 1rem;
+      line-height: 1.5;
+      color: var(--text);
+      transition: all 0.2s ease;
+      box-shadow: var(--shadow-sm);
+    }
+    
+    #surah-selector:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .feedback {
+      margin-top: 1.5rem;
+      padding: 1rem 1.5rem;
+      border-radius: 0.75rem;
+      text-align: center;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+    
+    .feedback.success {
+      background-color: rgba(34, 197, 94, 0.1);
+      color: var(--success);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+    
+    .feedback.error {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: var(--error);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .card {
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @media (max-width: 768px) {
+      .button-group {
+        flex-direction: column;
+        width: 100%;
+      }
+      
+      button {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .card-container {
+        gap: 1rem;
+        padding-right: 1rem;
+      }
+      
+      .sequence-area {
+        gap: 0.75rem;
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>بِسْمِ اللَّـهِ الرَّحْمَٰنِ الرَّحِيمِ</h1>
+  <h2>سورة الإخلاص</h2>
+  
+  <!-- Surah Selector -->
+  <div class="surah-selector-container" style="margin-bottom: 20px;">
+    <select id="surah-selector"></select>
+  </div>
+  
+  <div class="instructions">
+    <p>Click the cards or drag and drop them to the area below to arrange the verses in the correct sequence.</p>
+  </div>
+  
+  <div class="button-group">
+    <button id="shuffle-btn"> Shuffle Cards</button>
+    <button id="reset-btn"> Reset</button>
+    <button id="check-btn" class="check-answer"> Check Answer</button>
+  </div>
+  
+  <div id="feedback" class="feedback hidden"></div>
+  
+  <div class="card-container" id="card-container">
+    <!-- Cards will be generated dynamically -->
+  </div>
+  
+  <div class="sequence-container">
+    <h3 class="sequence-title"> Verse Sequence</h3>
+    <div class="sequence-area" id="sequence-area">
+      <!-- Drop zones will be generated dynamically -->
+    </div>
+  </div>
+  
+  <button id="toggle-dark">Toggle Dark Mode</button>
+  
+  <script>
+    let cardFlipEnabled = false;
+    let dataLoaded = false;
+    let juzAmmaSurahs = {};
+    let selectedCard = null; // Track the currently selected card
+
+    // Show loading message
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'loading-message';
+    loadingDiv.textContent = 'Loading surah data...';
+    document.body.appendChild(loadingDiv);
+
+    fetch('juz_amma_surahs.json')
+      .then(response => response.json())
+      .then(data => {
+        juzAmmaSurahs = data;
+        dataLoaded = true;
+        document.body.removeChild(loadingDiv);
+        initializeApp();
+      })
+      .catch(error => {
+        loadingDiv.textContent = 'Failed to load surah data.';
+        console.error('Error loading surah data:', error);
+      });
+
+    function initializeApp() {
+      // Populate surah selector
+      const surahSelector = document.getElementById('surah-selector');
+      surahSelector.innerHTML = '';
+      for (let i = 78; i <= 114; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        // Convert number to Arabic numerals
+        const arabicNum = i.toString().replace(/[0-9]/g, d => 
+          ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'][parseInt(d)]
+        );
+        option.textContent = `سورة ${juzAmmaSurahs[i]?.name || i} - ${arabicNum}`;
+        surahSelector.appendChild(option);
+      }
+      // Default to Surah Al-Ikhlas (112)
+      surahSelector.value = 112;
+
+      // Initial load
+      loadSurah(surahSelector.value);
+
+      // When surah is changed
+      surahSelector.addEventListener('change', (e) => {
+        loadSurah(e.target.value);
+        document.getElementById('feedback').classList.add('hidden');
+      });
+
+      // Shuffle cards
+      document.getElementById('shuffle-btn').addEventListener('click', () => {
+        const container = document.getElementById('card-container');
+        const cards = Array.from(container.children);
+        cards.forEach(card => {
+          card.style.visibility = 'visible';
+        });
+        cards.forEach(card => {
+          container.removeChild(card);
+          card.classList.remove('flipped');
+        });
+        for (let i = cards.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [cards[i], cards[j]] = [cards[j], cards[i]];
+        }
+        cards.forEach(card => {
+          container.appendChild(card);
+        });
+        resetSequenceArea();
+      });
+
+      // Reset button
+      document.getElementById('reset-btn').addEventListener('click', () => {
+        resetSequenceArea();
+        document.querySelectorAll('.card').forEach(card => {
+          card.style.visibility = 'visible';
+          card.classList.remove('flipped');
+        });
+        document.getElementById('feedback').classList.add('hidden');
+      });
+
+      // Check answer button
+      document.getElementById('check-btn').addEventListener('click', () => {
+        const feedbackElem = document.getElementById('feedback');
+        feedbackElem.classList.remove('hidden', 'success', 'error');
+        const zones = document.querySelectorAll('.drop-zone');
+        const allFilled = Array.from(zones).every(zone => zone.classList.contains('filled'));
+        if (!allFilled) {
+          feedbackElem.textContent = 'Please fill all positions';
+          feedbackElem.classList.add('error');
+          return;
+        }
+        let isCorrect = true;
+        zones.forEach(zone => {
+          const position = parseInt(zone.dataset.position);
+          const card = zone.querySelector('.card');
+          const verse = parseInt(card.dataset.verse);
+          if (position !== verse) {
+            isCorrect = false;
+          }
+        });
+        if (isCorrect) {
+          feedbackElem.textContent = 'Correct! Well done!';
+          feedbackElem.classList.add('success');
+        } else {
+          feedbackElem.textContent = 'Not quite right. Try again!';
+          feedbackElem.classList.add('error');
+        }
+      });
+
+      document.getElementById('toggle-dark').onclick = function() {
+        document.body.classList.toggle('dark-mode');
+      };
+
+      // In your initDragAndDrop function, add click handlers to cards:
+      document.querySelectorAll('.card').forEach(card => {
+        // Click to select card
+        card.addEventListener('click', (e) => {
+          if (cardFlipEnabled && !card.classList.contains('dragging')) {
+            card.classList.toggle('flipped');
+            return;
+          }
+          
+          // Deselect previously selected card
+          if (selectedCard) {
+            selectedCard.classList.remove('selected');
+          }
+          
+          // Select new card
+          selectedCard = card;
+          card.classList.add('selected');
+          
+          // Remove selection from all drop zones
+          document.querySelectorAll('.drop-zone').forEach(zone => {
+            zone.classList.remove('selected');
+          });
+        });
+
+        // Existing drag and drop code
+        card.addEventListener('dragstart', (e) => {
+          dragged = card;
+          card.classList.add('dragging');
+          e.dataTransfer.setData('text/plain', card.dataset.verse);
+          e.dataTransfer.effectAllowed = 'move';
+          const dragImage = card.cloneNode(true);
+          dragImage.style.opacity = '0.7';
+          document.body.appendChild(dragImage);
+          e.dataTransfer.setDragImage(dragImage, 175, 125);
+          setTimeout(() => {
+            document.body.removeChild(dragImage);
+          }, 0);
+        });
+        
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+        });
+      });
+
+      document.querySelectorAll('.drop-zone').forEach(zone => {
+        // Click to drop selected card
+        zone.addEventListener('click', () => {
+          if (selectedCard) {
+            const existingCard = zone.querySelector('.card');
+            if (existingCard) {
+              const verse = existingCard.dataset.verse;
+              const originalCard = document.querySelector(`.card[data-verse="${verse}"]`);
+              if (originalCard) {
+                originalCard.style.visibility = 'visible';
+              }
+              zone.removeChild(existingCard);
+            }
+
+            const verse = selectedCard.dataset.verse;
+            const isCorrect = parseInt(verse) === parseInt(zone.dataset.position);
+            const correctIcon = zone.querySelector('.feedback-icon.correct');
+            const incorrectIcon = zone.querySelector('.feedback-icon.incorrect');
+
+            if (isCorrect) {
+              correctIcon.style.display = 'block';
+              incorrectIcon.style.display = 'none';
+            } else {
+              correctIcon.style.display = 'none';
+              incorrectIcon.style.display = 'block';
+              setTimeout(() => {
+                incorrectIcon.style.display = 'none';
+              }, 2000);
+            }
+
+            const cardClone = selectedCard.cloneNode(true);
+            cardClone.classList.remove('dragging', 'selected');
+            cardClone.setAttribute('draggable', 'true');
+            
+            // Add click handlers to the cloned card
+            cardClone.addEventListener('click', () => {
+              if (cardFlipEnabled) {
+                cardClone.classList.toggle('flipped');
+              }
+            });
+            
+            cardClone.addEventListener('dblclick', () => {
+              zone.querySelector('span').style.display = 'block';
+              zone.classList.remove('filled');
+              correctIcon.style.display = 'none';
+              incorrectIcon.style.display = 'none';
+              zone.removeChild(cardClone);
+              const originalCard = document.querySelector(`.card[data-verse="${verse}"]`);
+              if (originalCard && originalCard.style.visibility === 'hidden') {
+                originalCard.style.visibility = 'visible';
+              }
+            });
+
+            zone.querySelector('span').style.display = 'none';
+            zone.appendChild(cardClone);
+            zone.classList.add('filled');
+            cardClone.style.position = 'absolute';
+            cardClone.style.top = '0';
+            cardClone.style.left = '0';
+            cardClone.style.margin = '0';
+            cardClone.style.width = '100%';
+            cardClone.style.height = '100%';
+            selectedCard.style.visibility = 'hidden';
+            
+            // Clear selection
+            selectedCard.classList.remove('selected');
+            selectedCard = null;
+          }
+        });
+
+        // Existing drag and drop code
+        zone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          zone.classList.add('highlight');
+        });
+        
+        zone.addEventListener('dragleave', () => {
+          zone.classList.remove('highlight');
+        });
+        
+        zone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          zone.classList.remove('highlight');
+          const existingCard = zone.querySelector('.card');
+          if (existingCard) {
+            const verse = existingCard.dataset.verse;
+            const originalCard = document.querySelector(`.card[data-verse="${verse}"]`);
+            if (originalCard) {
+              originalCard.style.visibility = 'visible';
+            }
+            zone.removeChild(existingCard);
+          }
+          const verse = e.dataTransfer.getData('text/plain');
+          const draggedCard = document.querySelector(`.card[data-verse="${verse}"]`);
+          const isCorrect = parseInt(verse) === parseInt(zone.dataset.position);
+          const correctIcon = zone.querySelector('.feedback-icon.correct');
+          const incorrectIcon = zone.querySelector('.feedback-icon.incorrect');
+          if (isCorrect) {
+            correctIcon.style.display = 'block';
+            incorrectIcon.style.display = 'none';
+          } else {
+            correctIcon.style.display = 'none';
+            incorrectIcon.style.display = 'block';
+            setTimeout(() => {
+              incorrectIcon.style.display = 'none';
+            }, 2000);
+          }
+          const cardClone = draggedCard.cloneNode(true);
+          cardClone.classList.remove('dragging');
+          cardClone.setAttribute('draggable', 'true');
+          cardClone.addEventListener('click', () => {
+            if (cardFlipEnabled) {
+              cardClone.classList.toggle('flipped');
+            }
+          });
+          cardClone.addEventListener('dblclick', () => {
+            zone.querySelector('span').style.display = 'block';
+            zone.classList.remove('filled');
+            correctIcon.style.display = 'none';
+            incorrectIcon.style.display = 'none';
+            zone.removeChild(cardClone);
+            const originalCard = document.querySelector(`.card[data-verse="${verse}"]`);
+            if (originalCard && originalCard.style.visibility === 'hidden') {
+              originalCard.style.visibility = 'visible';
+            }
+          });
+          zone.querySelector('span').style.display = 'none';
+          zone.appendChild(cardClone);
+          zone.classList.add('filled');
+          cardClone.style.position = 'absolute';
+          cardClone.style.top = '0';
+          cardClone.style.left = '0';
+          cardClone.style.margin = '0';
+          cardClone.style.width = '100%';
+          cardClone.style.height = '100%';
+          draggedCard.style.visibility = 'hidden';
+        });
+      });
+
+      // Add click outside to deselect
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.card') && !e.target.closest('.drop-zone')) {
+          if (selectedCard) {
+            selectedCard.classList.remove('selected');
+            selectedCard = null;
+          }
+          document.querySelectorAll('.drop-zone').forEach(zone => {
+            zone.classList.remove('selected');
+          });
+        }
+      });
+    }
+
+    // Generate cards and drop zones for selected surah
+    function loadSurah(surahNum) {
+      const surah = juzAmmaSurahs[surahNum];
+      if (!surah) return;
+      document.querySelector('h2').textContent = `سورة ${surah.name}`;
+      const cardContainer = document.getElementById('card-container');
+      const sequenceArea = document.getElementById('sequence-area');
+      cardContainer.innerHTML = '';
+      sequenceArea.innerHTML = '';
+      const cards = surah.ayat.map((ayah, idx) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.setAttribute('draggable', 'true');
+        card.dataset.verse = idx + 1;
+        card.innerHTML = `
+          <div class="card-face card-front">
+            <div class="ayah-text">${ayah}</div>
+          </div>
+          <div class="card-face card-back">
+            <div class="pattern"></div>
+            <div class="corner top-left"></div>
+            <div class="corner top-right"></div>
+            <div class="corner bottom-left"></div>
+            <div class="corner bottom-right"></div>
+          </div>
+        `;
+        return card;
+      });
+      shuffleArray(cards);
+      cards.forEach(card => cardContainer.appendChild(card));
+      const numCards = surah.ayat.length;
+      const numRows = Math.min(4, Math.ceil(numCards / 4));
+      const numCols = Math.ceil(numCards / numRows);
+      cardContainer.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
+      cardContainer.style.gridTemplateRows = `repeat(${numRows}, 1fr)`;
+      sequenceArea.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
+      sequenceArea.style.gridTemplateRows = `repeat(${numRows}, 1fr)`;
+      for (let i = 1; i <= surah.ayat.length; i++) {
+        const zone = document.createElement('div');
+        zone.className = 'drop-zone';
+        zone.dataset.position = i;
+        zone.innerHTML = `
+          <span>${i}</span>
+          <div class="feedback-icon correct">✓</div>
+          <div class="feedback-icon incorrect">✗</div>
+        `;
+        sequenceArea.appendChild(zone);
+      }
+      initDragAndDrop();
+    }
+
+    // Drag and drop logic (refactored for dynamic cards/zones)
+    function initDragAndDrop() {
+      document.querySelectorAll('.card').forEach(card => {
+        // Click to select card
+        card.addEventListener('click', (e) => {
+          if (cardFlipEnabled && !card.classList.contains('dragging')) {
+            card.classList.toggle('flipped');
+            return;
+          }
+          
+          // Deselect previously selected card
+          if (selectedCard) {
+            selectedCard.classList.remove('selected');
+          }
+          
+          // Select new card
+          selectedCard = card;
+          card.classList.add('selected');
+          
+          // Remove selection from all drop zones
+          document.querySelectorAll('.drop-zone').forEach(zone => {
+            zone.classList.remove('selected');
+          });
+        });
+
+        // Existing drag and drop code
+        card.addEventListener('dragstart', (e) => {
+          dragged = card;
+          card.classList.add('dragging');
+          e.dataTransfer.setData('text/plain', card.dataset.verse);
+          e.dataTransfer.effectAllowed = 'move';
+          const dragImage = card.cloneNode(true);
+          dragImage.style.opacity = '0.7';
+          document.body.appendChild(dragImage);
+          e.dataTransfer.setDragImage(dragImage, 175, 125);
+          setTimeout(() => {
+            document.body.removeChild(dragImage);
+          }, 0);
+        });
+        
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+        });
+      });
+
+      document.querySelectorAll('.drop-zone').forEach(zone => {
+        // Click to drop selected card
+        zone.addEventListener('click', () => {
+          if (selectedCard) {
+            const existingCard = zone.querySelector('.card');
+            if (existingCard) {
+              const verse = existingCard.dataset.verse;
+              const originalCard = document.querySelector(`.card[data-verse="${verse}"]`);
+              if (originalCard) {
+                originalCard.style.visibility = 'visible';
+              }
+              zone.removeChild(existingCard);
+            }
+
+            const verse = selectedCard.dataset.verse;
+            const isCorrect = parseInt(verse) === parseInt(zone.dataset.position);
+            const correctIcon = zone.querySelector('.feedback-icon.correct');
+            const incorrectIcon = zone.querySelector('.feedback-icon.incorrect');
+
+            if (isCorrect) {
+              correctIcon.style.display = 'block';
+              incorrectIcon.style.display = 'none';
+            } else {
+              correctIcon.style.display = 'none';
+              incorrectIcon.style.display = 'block';
+              setTimeout(() => {
+                incorrectIcon.style.display = 'none';
+              }, 2000);
+            }
+
+            const cardClone = selectedCard.cloneNode(true);
+            cardClone.classList.remove('dragging', 'selected');
+            cardClone.setAttribute('draggable', 'true');
+            
+            // Add click handlers to the cloned card
+            cardClone.addEventListener('click', () => {
+              if (cardFlipEnabled) {
+                cardClone.classList.toggle('flipped');
+              }
+            });
+            
+            cardClone.addEventListener('dblclick', () => {
+              zone.querySelector('span').style.display = 'block';
+              zone.classList.remove('filled');
+              correctIcon.style.display = 'none';
+              incorrectIcon.style.display = 'none';
+              zone.removeChild(cardClone);
+              const originalCard = document.querySelector(`.card[data-verse="${verse}"]`);
+              if (originalCard && originalCard.style.visibility === 'hidden') {
+                originalCard.style.visibility = 'visible';
+              }
+            });
+
+            zone.querySelector('span').style.display = 'none';
+            zone.appendChild(cardClone);
+            zone.classList.add('filled');
+            cardClone.style.position = 'absolute';
+            cardClone.style.top = '0';
+            cardClone.style.left = '0';
+            cardClone.style.margin = '0';
+            cardClone.style.width = '100%';
+            cardClone.style.height = '100%';
+            selectedCard.style.visibility = 'hidden';
+            
+            // Clear selection
+            selectedCard.classList.remove('selected');
+            selectedCard = null;
+          }
+        });
+
+        // Existing drag and drop code
+        zone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          zone.classList.add('highlight');
+        });
+        
+        zone.addEventListener('dragleave', () => {
+          zone.classList.remove('highlight');
+        });
+        
+        zone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          zone.classList.remove('highlight');
+          const existingCard = zone.querySelector('.card');
+          if (existingCard) {
+            const verse = existingCard.dataset.verse;
+            const originalCard = document.querySelector(`.card[data-verse="${verse}"]`);
+            if (originalCard) {
+              originalCard.style.visibility = 'visible';
+            }
+            zone.removeChild(existingCard);
+          }
+          const verse = e.dataTransfer.getData('text/plain');
+          const draggedCard = document.querySelector(`.card[data-verse="${verse}"]`);
+          const isCorrect = parseInt(verse) === parseInt(zone.dataset.position);
+          const correctIcon = zone.querySelector('.feedback-icon.correct');
+          const incorrectIcon = zone.querySelector('.feedback-icon.incorrect');
+          if (isCorrect) {
+            correctIcon.style.display = 'block';
+            incorrectIcon.style.display = 'none';
+          } else {
+            correctIcon.style.display = 'none';
+            incorrectIcon.style.display = 'block';
+            setTimeout(() => {
+              incorrectIcon.style.display = 'none';
+            }, 2000);
+          }
+          const cardClone = draggedCard.cloneNode(true);
+          cardClone.classList.remove('dragging');
+          cardClone.setAttribute('draggable', 'true');
+          cardClone.addEventListener('click', () => {
+            if (cardFlipEnabled) {
+              cardClone.classList.toggle('flipped');
+            }
+          });
+          cardClone.addEventListener('dblclick', () => {
+            zone.querySelector('span').style.display = 'block';
+            zone.classList.remove('filled');
+            correctIcon.style.display = 'none';
+            incorrectIcon.style.display = 'none';
+            zone.removeChild(cardClone);
+            const originalCard = document.querySelector(`.card[data-verse="${verse}"]`);
+            if (originalCard && originalCard.style.visibility === 'hidden') {
+              originalCard.style.visibility = 'visible';
+            }
+          });
+          zone.querySelector('span').style.display = 'none';
+          zone.appendChild(cardClone);
+          zone.classList.add('filled');
+          cardClone.style.position = 'absolute';
+          cardClone.style.top = '0';
+          cardClone.style.left = '0';
+          cardClone.style.margin = '0';
+          cardClone.style.width = '100%';
+          cardClone.style.height = '100%';
+          draggedCard.style.visibility = 'hidden';
+        });
+      });
+
+      // Add click outside to deselect
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.card') && !e.target.closest('.drop-zone')) {
+          if (selectedCard) {
+            selectedCard.classList.remove('selected');
+            selectedCard = null;
+          }
+          document.querySelectorAll('.drop-zone').forEach(zone => {
+            zone.classList.remove('selected');
+          });
+        }
+      });
+    }
+
+    function resetSequenceArea() {
+      document.querySelectorAll('.drop-zone').forEach(zone => {
+        Array.from(zone.children).forEach(child => {
+          if (child.classList && child.classList.contains('card')) {
+            zone.removeChild(child);
+          }
+        });
+        zone.querySelector('span').style.display = 'block';
+        zone.querySelector('.feedback-icon.correct').style.display = 'none';
+        zone.querySelector('.feedback-icon.incorrect').style.display = 'none';
+        zone.classList.remove('filled');
+      });
+    }
+
+    // Helper to shuffle an array
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+  </script>
+</body>
+</html>
