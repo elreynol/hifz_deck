@@ -76,6 +76,7 @@
       background: var(--surface);
       border: 1px solid var(--border);
       margin: 0 auto;
+      direction: rtl;
     }
     
     .card.large {
@@ -117,15 +118,17 @@
       align-items: center;
       justify-content: center;
       transition: all 0.3s ease;
+      padding: 1.5rem;
+      box-sizing: border-box;
     }
     
     .card-front {
       background-color: var(--surface);
-      padding: 1.5rem;
       text-align: center;
       display: flex;
       align-items: center;
       justify-content: center;
+      width: 100%;
     }
     
     .card-back {
@@ -138,14 +141,15 @@
       font-size: clamp(16px, 1.6vw, 22px);
       line-height: 1.4;
       color: var(--text);
-      max-width: 100%;
+      width: 100%;
       word-break: break-word;
       overflow-wrap: break-word;
       text-align: center;
       white-space: normal;
-      padding: 0 1rem;
+      padding: 0;
       box-sizing: border-box;
       font-family: 'Noto Naskh Arabic', serif;
+      direction: rtl;
     }
     
     .pattern {
@@ -429,6 +433,13 @@
         padding: 1rem;
       }
     }
+
+    h2 {
+      font-size: 2.5rem;
+      margin: 1rem 0;
+      color: var(--text);
+      font-family: 'Noto Naskh Arabic', serif;
+    }
   </style>
 </head>
 <body>
@@ -501,7 +512,7 @@
         const arabicNum = i.toString().replace(/[0-9]/g, d => 
           ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'][parseInt(d)]
         );
-        option.textContent = `سورة ${juzAmmaSurahs[i]?.name || i} - ${arabicNum}`;
+        option.textContent = `${juzAmmaSurahs[i]?.name || i} - ${arabicNum}`;
         surahSelector.appendChild(option);
       }
       // Default to Surah Al-Ikhlas (112)
@@ -649,9 +660,6 @@
             } else {
               correctIcon.style.display = 'none';
               incorrectIcon.style.display = 'block';
-              setTimeout(() => {
-                incorrectIcon.style.display = 'none';
-              }, 2000);
             }
 
             const cardClone = selectedCard.cloneNode(true);
@@ -714,6 +722,9 @@
             if (originalCard) {
               originalCard.style.visibility = 'visible';
             }
+            // Clear feedback icons when removing existing card
+            zone.querySelector('.feedback-icon.correct').style.display = 'none';
+            zone.querySelector('.feedback-icon.incorrect').style.display = 'none';
             zone.removeChild(existingCard);
           }
           const verse = e.dataTransfer.getData('text/plain');
@@ -727,9 +738,6 @@
           } else {
             correctIcon.style.display = 'none';
             incorrectIcon.style.display = 'block';
-            setTimeout(() => {
-              incorrectIcon.style.display = 'none';
-            }, 2000);
           }
           const cardClone = draggedCard.cloneNode(true);
           cardClone.classList.remove('dragging');
@@ -815,8 +823,8 @@
       shuffleArray(cards);
       cards.forEach(card => cardContainer.appendChild(card));
       const numCards = surah.ayat.length;
-      const numRows = Math.min(4, Math.ceil(numCards / 4));
-      const numCols = Math.ceil(numCards / numRows);
+      const numRows = Math.min(4, Math.ceil(numCards / 8)); // Use 8 as max columns
+      const numCols = Math.min(8, Math.ceil(numCards / numRows)); // Limit to 8 columns
       cardContainer.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
       cardContainer.style.gridTemplateRows = `repeat(${numRows}, 1fr)`;
       sequenceArea.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
@@ -905,9 +913,6 @@
             } else {
               correctIcon.style.display = 'none';
               incorrectIcon.style.display = 'block';
-              setTimeout(() => {
-                incorrectIcon.style.display = 'none';
-              }, 2000);
             }
 
             const cardClone = selectedCard.cloneNode(true);
@@ -970,6 +975,9 @@
             if (originalCard) {
               originalCard.style.visibility = 'visible';
             }
+            // Clear feedback icons when removing existing card
+            zone.querySelector('.feedback-icon.correct').style.display = 'none';
+            zone.querySelector('.feedback-icon.incorrect').style.display = 'none';
             zone.removeChild(existingCard);
           }
           const verse = e.dataTransfer.getData('text/plain');
@@ -983,9 +991,6 @@
           } else {
             correctIcon.style.display = 'none';
             incorrectIcon.style.display = 'block';
-            setTimeout(() => {
-              incorrectIcon.style.display = 'none';
-            }, 2000);
           }
           const cardClone = draggedCard.cloneNode(true);
           cardClone.classList.remove('dragging');
