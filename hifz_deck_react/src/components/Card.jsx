@@ -2,28 +2,30 @@ import React from 'react';
 import { Box, Text, useColorMode } from '@chakra-ui/react';
 
 /**
- * A tappable ayah card.
+ * A tappable ayah card — manuscript-like surface with clear feedback states.
  * status: 'idle' | 'correct' | 'incorrect' | 'completed'
  */
-const Card = ({ ayah, status = 'idle', onTap, isFaceDown, readOnly = false }) => {
+const Card = ({ ayah, status = 'idle', onTap, isFaceDown, readOnly = false, isElite = false }) => {
   const { colorMode } = useColorMode();
+  const isDark = colorMode === 'dark';
 
-  // Background color based on feedback status
   const getBg = () => {
-    if (status === 'correct' || status === 'completed') {
-      return colorMode === 'dark' ? 'green.700' : 'green.100';
+    if (status === 'incorrect') return isDark ? 'red.800' : 'red.50';
+    if (status === 'correct') return isDark ? 'green.800' : 'green.50';
+    if (status === 'completed') {
+      if (isElite) return isDark ? 'elite.800' : 'elite.50';
+      return isDark ? 'ink.800' : 'ink.50';
     }
-    if (status === 'incorrect') {
-      return colorMode === 'dark' ? 'red.700' : 'red.100';
-    }
-    return colorMode === 'dark' ? 'gray.700' : 'white';
+    return isDark ? 'rgba(34, 66, 63, 0.72)' : 'rgba(255, 255, 255, 0.82)';
   };
 
-  // Border color based on feedback status
   const getBorderColor = () => {
-    if (status === 'correct' || status === 'completed') return 'green.400';
+    if (status === 'correct' || status === 'completed') {
+      return isElite ? 'elite.400' : 'ink.300';
+    }
     if (status === 'incorrect') return 'red.400';
-    return colorMode === 'dark' ? 'gray.600' : 'gray.200';
+    if (isElite) return isDark ? 'elite.400' : 'elite.300';
+    return isDark ? 'whiteAlpha.200' : 'mist.200';
   };
 
   const handleClick = (e) => {
@@ -35,47 +37,57 @@ const Card = ({ ayah, status = 'idle', onTap, isFaceDown, readOnly = false }) =>
 
   return (
     <Box
-      p={{ base: 3, md: 4 }}
+      p={{ base: 3, md: 5 }}
       bg={getBg()}
-      borderRadius="md"
-      boxShadow={readOnly ? 'sm' : 'md'}
-      border="2px solid"
+      borderRadius="lg"
+      boxShadow={readOnly ? 'soft' : 'panel'}
+      border="1px solid"
       borderColor={getBorderColor()}
+      backdropFilter="blur(10px)"
       cursor={readOnly ? 'default' : 'pointer'}
       width="100%"
       maxW={{ base: '100%', md: '280px' }}
-      minH={{ base: '88px', md: '120px' }}
+      minH={{ base: '72px', md: '128px' }}
       display="flex"
       alignItems="center"
       justifyContent="center"
       onClick={handleClick}
-      transition="all 0.2s"
+      transition="transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease"
       _hover={
         readOnly
           ? undefined
           : {
-              transform: 'translateY(-2px)',
-              boxShadow: 'lg',
+              transform: { base: 'none', md: 'translateY(-3px)' },
+              boxShadow: 'panel',
+              borderColor: isElite ? 'elite.400' : 'ink.400',
+            }
+      }
+      _active={
+        readOnly
+          ? undefined
+          : {
+              transform: 'scale(0.99)',
             }
       }
       style={{
         fontFamily: 'Noto Naskh Arabic, serif',
-        fontSize: '1.5rem',
         textAlign: 'center',
         direction: 'rtl',
         userSelect: 'none',
       }}
     >
       {isFaceDown ? (
-        <Text fontSize="4xl" color={colorMode === 'dark' ? 'gray.500' : 'gray.400'}>
+        <Text fontSize={{ base: '3xl', md: '4xl' }} color={isDark ? 'whiteAlpha.400' : 'mist.400'}>
           ?
         </Text>
       ) : (
         <Text
-          fontSize={{ base: 'lg', md: 'xl' }}
+          fontSize={{ base: 'md', md: 'xl' }}
+          lineHeight={{ base: '1.55', md: '1.7' }}
           textAlign="center"
-          color={colorMode === 'dark' ? 'white' : 'gray.800'}
+          color={isDark ? 'mist.50' : 'ink.900'}
           dir="rtl"
+          fontFamily="arabic"
         >
           {ayah}
         </Text>
