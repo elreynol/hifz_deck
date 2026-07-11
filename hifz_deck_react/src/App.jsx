@@ -15,6 +15,9 @@ import { useAuth } from './context/AuthContext';
 import { supabase } from './supabaseClient';
 import AccountSettings from './components/AccountSettings';
 
+// Max cards shown in the tap pool at once (keeps long surahs manageable)
+const MAX_VISIBLE_CARDS = 5;
+
 const App = () => {
   const { sequence, isLoading, error } = useSequence();
   const { 
@@ -46,6 +49,8 @@ const App = () => {
   const [feedbackCardId, setFeedbackCardId] = useState(null);
   const [feedbackStatus, setFeedbackStatus] = useState('idle'); // 'idle' | 'correct' | 'incorrect'
   const feedbackTimeoutRef = useRef(null);
+  // IDs of cards currently shown in the pool (max MAX_VISIBLE_CARDS)
+  const [visiblePoolIds, setVisiblePoolIds] = useState([]);
 
   // Auth state
   const { isOpen: isAuthModalOpen, onOpen: onAuthModalOpen, onClose: onAuthModalClose } = useDisclosure();
@@ -126,6 +131,7 @@ const App = () => {
         setFailCount(0);
         setFeedbackCardId(null);
         setFeedbackStatus('idle');
+        setVisiblePoolIds([]);
         if (timerRef.current) clearInterval(timerRef.current);
         if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
       }
@@ -166,6 +172,26 @@ const App = () => {
     return newArray;
   };
 
+  /**
+   * Build a visible pool of up to MAX_VISIBLE_CARDS.
+   * Always includes the next expected ayah so the game stays solvable,
+   * then fills with random distractors from remaining unplaced cards.
+   */
+  const buildVisiblePoolIds = (allCards, expectedVerse) => {
+    const unplaced = allCards.filter((c) => c.position === null);
+    if (unplaced.length === 0) return [];
+
+    const correct = unplaced.find((c) => c.verse === expectedVerse);
+    const distractors = shuffleArray(unplaced.filter((c) => c.verse !== expectedVerse));
+    const slotsForDistractors = Math.max(0, MAX_VISIBLE_CARDS - (correct ? 1 : 0));
+    const selected = correct
+      ? [correct, ...distractors.slice(0, slotsForDistractors)]
+      : distractors.slice(0, MAX_VISIBLE_CARDS);
+
+    // Shuffle so the correct ayah is not always in the same spot
+    return shuffleArray(selected).map((c) => c.id);
+  };
+
   // Flash correct/incorrect feedback on a card, then clear it
   const flashFeedback = (cardId, status, durationMs = 500) => {
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
@@ -179,15 +205,15 @@ const App = () => {
 
   // Full sequence restart after 3 strikes: reshuffle, clear progress, restart from ayah 1
   const handleStrikeReset = () => {
-    setCards((prevCards) =>
-      shuffleArray(
-        prevCards.map((card) => ({
-          ...card,
-          position: null,
-          isFaceDown: false,
-        }))
-      )
+    const resetCards = shuffleArray(
+      cards.map((card) => ({
+        ...card,
+        position: null,
+        isFaceDown: false,
+      }))
     );
+    setCards(resetCards);
+    setVisiblePoolIds(buildVisiblePoolIds(resetCards, 1));
     setNextExpectedVerse(1);
     setFailCount(0);
     setFeedbackCardId(null);
@@ -225,6 +251,7 @@ const App = () => {
 
       const allDone = updatedCards.every((c) => c.position !== null);
       if (allDone) {
+        setVisiblePoolIds([]);
         setTimerActive(false);
         const recordedTime = formatTime(time);
         toast({
@@ -239,10 +266,13 @@ const App = () => {
           updateLeaderboards(selectedSurah, time);
         }
       } else {
-        setNextExpectedVerse((prev) => prev + 1);
+        // Advance and refill the pool with the new expected ayah + fresh distractors
+        const newExpected = nextExpectedVerse + 1;
+        setNextExpectedVerse(newExpected);
+        setVisiblePoolIds(buildVisiblePoolIds(updatedCards, newExpected));
       }
     } else {
-      // Incorrect tap
+      // Incorrect tap — pool stays the same
       const newFailCount = failCount + 1;
       flashFeedback(cardId, 'incorrect', 500);
 
@@ -266,9 +296,11 @@ const App = () => {
       });
       return;
     }
-    setCards((prevCards) =>
-      shuffleArray(prevCards.map((card) => ({ ...card, position: null, isFaceDown: false })))
+    const startedCards = shuffleArray(
+      cards.map((card) => ({ ...card, position: null, isFaceDown: false }))
     );
+    setCards(startedCards);
+    setVisiblePoolIds(buildVisiblePoolIds(startedCards, 1));
     setGameStarted(true);
     setNextExpectedVerse(1);
     setFailCount(0);
@@ -280,16 +312,13 @@ const App = () => {
     }
   };
 
+  // Reshuffle which distractors appear in the visible pool (correct ayah stays included)
   const handleShuffle = () => {
     if (!gameStarted) {
       toast({ title: 'Start the game first!', status: 'info', duration: 2000, isClosable: true });
       return;
     }
-    setCards((prevCards) => {
-      const unplacedCards = prevCards.filter((card) => !card.position);
-      const placedCards = prevCards.filter((card) => card.position);
-      return [...shuffleArray(unplacedCards), ...placedCards];
-    });
+    setVisiblePoolIds(buildVisiblePoolIds(cards, nextExpectedVerse));
   };
 
   const handleReset = () => {
@@ -313,6 +342,7 @@ const App = () => {
     setFailCount(0);
     setFeedbackCardId(null);
     setFeedbackStatus('idle');
+    setVisiblePoolIds([]);
     if (timerRef.current) clearInterval(timerRef.current);
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
   };
@@ -608,6 +638,10 @@ const App = () => {
   }
 
   const unplacedCards = cards.filter(card => !card.position);
+  // Only show up to 5 cards from the visible pool (in pool order)
+  const visibleCards = visiblePoolIds
+    .map((id) => cards.find((c) => c.id === id && c.position === null))
+    .filter(Boolean);
 
   return (
     <Box>
@@ -708,7 +742,7 @@ const App = () => {
               </Button>
             ) : (
               <Button onClick={handleShuffle} colorScheme="blue" isDisabled={!gameStarted}>
-                Shuffle Remaining
+                Shuffle Choices
               </Button>
             )}
             <Button onClick={handleReset} colorScheme="orange" leftIcon={<RepeatIcon />} isDisabled={isLoading}>
@@ -746,18 +780,29 @@ const App = () => {
               >
                 <Text
                   fontSize={{ base: 'md', md: 'lg' }}
-                  mb={3}
+                  mb={1}
                   color={colorMode === 'dark' ? 'gray.300' : 'gray.600'}
                   textAlign="center"
                 >
                   Tap the next ayah
                 </Text>
+                {unplacedCards.length > MAX_VISIBLE_CARDS && (
+                  <Text
+                    fontSize="sm"
+                    mb={3}
+                    color={colorMode === 'dark' ? 'gray.500' : 'gray.500'}
+                    textAlign="center"
+                  >
+                    Showing {visibleCards.length} of {unplacedCards.length} remaining
+                  </Text>
+                )}
                 <SimpleGrid
-                  columns={{ base: 1, sm: 2, md: 3 }}
+                  columns={{ base: 1, sm: 2, md: Math.min(3, visibleCards.length || 1) }}
                   spacing={3}
                   w="100%"
+                  mt={unplacedCards.length > MAX_VISIBLE_CARDS ? 0 : 3}
                 >
-                  {unplacedCards.map((card) => {
+                  {visibleCards.map((card) => {
                     // Show flash feedback on the card that was just tapped
                     const status =
                       feedbackCardId === card.id ? feedbackStatus : 'idle';
