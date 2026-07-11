@@ -1,61 +1,78 @@
 import React from 'react';
 import { Box, Text, useColorMode } from '@chakra-ui/react';
-import { useDrag } from 'react-dnd';
 
-const Card = ({ ayah, isSelected, onSelect, id, index, onDoubleClick, isFaceDown }) => {
+/**
+ * A tappable ayah card.
+ * status: 'idle' | 'correct' | 'incorrect' | 'completed'
+ */
+const Card = ({ ayah, status = 'idle', onTap, isFaceDown, readOnly = false }) => {
   const { colorMode } = useColorMode();
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: 'CARD',
-    item: { id },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  }));
+
+  // Background color based on feedback status
+  const getBg = () => {
+    if (status === 'correct' || status === 'completed') {
+      return colorMode === 'dark' ? 'green.700' : 'green.100';
+    }
+    if (status === 'incorrect') {
+      return colorMode === 'dark' ? 'red.700' : 'red.100';
+    }
+    return colorMode === 'dark' ? 'gray.700' : 'white';
+  };
+
+  // Border color based on feedback status
+  const getBorderColor = () => {
+    if (status === 'correct' || status === 'completed') return 'green.400';
+    if (status === 'incorrect') return 'red.400';
+    return colorMode === 'dark' ? 'gray.600' : 'gray.200';
+  };
 
   const handleClick = (e) => {
     e.stopPropagation();
-    onSelect();
+    if (!readOnly && onTap) {
+      onTap();
+    }
   };
 
   return (
     <Box
-      ref={drag}
-      className={isDragging ? 'dragging' : ''}
-      p={4}
-      bg={isSelected ? (colorMode === 'dark' ? 'blue.600' : 'blue.100') : (colorMode === 'dark' ? 'gray.700' : 'white')}
+      p={{ base: 3, md: 4 }}
+      bg={getBg()}
       borderRadius="md"
-      boxShadow="md"
-      cursor="move"
-      opacity={isDragging ? 0.5 : 1}
-      width="250px"
-      height="150px"
+      boxShadow={readOnly ? 'sm' : 'md'}
+      border="2px solid"
+      borderColor={getBorderColor()}
+      cursor={readOnly ? 'default' : 'pointer'}
+      width="100%"
+      maxW={{ base: '100%', md: '280px' }}
+      minH={{ base: '88px', md: '120px' }}
       display="flex"
       alignItems="center"
       justifyContent="center"
-      onDoubleClick={(e) => {
-        e.stopPropagation();
-        onDoubleClick();
-      }}
       onClick={handleClick}
       transition="all 0.2s"
-      _hover={{
-        transform: 'translateY(-2px)',
-        boxShadow: 'lg',
-      }}
+      _hover={
+        readOnly
+          ? undefined
+          : {
+              transform: 'translateY(-2px)',
+              boxShadow: 'lg',
+            }
+      }
       style={{
         fontFamily: 'Noto Naskh Arabic, serif',
         fontSize: '1.5rem',
         textAlign: 'center',
         direction: 'rtl',
         userSelect: 'none',
-        touchAction: 'none',
       }}
     >
       {isFaceDown ? (
-        <Text fontSize="4xl" color={colorMode === 'dark' ? 'gray.500' : 'gray.400'}>?</Text>
+        <Text fontSize="4xl" color={colorMode === 'dark' ? 'gray.500' : 'gray.400'}>
+          ?
+        </Text>
       ) : (
         <Text
-          fontSize="xl"
+          fontSize={{ base: 'lg', md: 'xl' }}
           textAlign="center"
           color={colorMode === 'dark' ? 'white' : 'gray.800'}
           dir="rtl"
@@ -67,4 +84,4 @@ const Card = ({ ayah, isSelected, onSelect, id, index, onDoubleClick, isFaceDown
   );
 };
 
-export default Card; 
+export default Card;
