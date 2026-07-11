@@ -3,7 +3,8 @@ import {
   Box, VStack, Heading, Text, Button, HStack, Container, useToast, IconButton, 
   useColorMode, Select, Modal, ModalOverlay, ModalContent, ModalHeader, 
   ModalFooter, ModalBody, ModalCloseButton, FormControl, FormLabel, Input, useDisclosure,
-  Table, Thead, Tbody, Tr, Th, Td, TableContainer, Tabs, TabList, Tab, TabPanels, TabPanel
+  Table, Thead, Tbody, Tr, Th, Td, TableContainer, Tabs, TabList, Tab, TabPanels, TabPanel,
+  Checkbox
 } from '@chakra-ui/react';
 import { MoonIcon, SunIcon, ArrowRightIcon, CheckIcon, RepeatIcon, StarIcon } from '@chakra-ui/icons';
 import Card from './components/Card';
@@ -23,6 +24,7 @@ const App = () => {
   const [timerActive, setTimerActive] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const timerRef = useRef(null);
+  const [stopwatchEnabled, setStopwatchEnabled] = useState(true);
 
   // Auth state
   const { isOpen: isAuthModalOpen, onOpen: onAuthModalOpen, onClose: onAuthModalClose } = useDisclosure();
@@ -71,7 +73,8 @@ const App = () => {
           id: idx + 1,
           text: ayah,
           verse: idx + 1,
-          position: null
+          position: null,
+          isFaceDown: true
         }));
         // Cards are prepared but not shuffled until game start
         setCards(newCards); 
@@ -151,10 +154,17 @@ const App = () => {
       });
       return;
     }
-    setCards(prevCards => shuffleArray([...prevCards.filter(c => !c.position)])); // Shuffle only unplaced cards initially
+    setCards(prevCards => {
+      const unplacedCards = prevCards.filter(c => !c.position);
+      const placedCards = prevCards.filter(c => c.position);
+      const shuffledUnplacedCards = shuffleArray(unplacedCards).map(card => ({ ...card, isFaceDown: false })); // Flip unplaced cards
+      return [...shuffledUnplacedCards, ...placedCards];
+    });
     setGameStarted(true);
-    setTime(0);
-    setTimerActive(true);
+    setTime(0); // Always reset time
+    if (stopwatchEnabled) {
+      setTimerActive(true); // Only activate timer if enabled
+    }
     setSelectedCard(null);
   };
 
@@ -182,15 +192,16 @@ const App = () => {
           id: idx + 1,
           text: ayah,
           verse: idx + 1,
-          position: null
+          position: null,
+          isFaceDown: true
         }));
         setCards(newCards); // Reset to initial, unshuffled state
         setSelectedCard(null);
       }
     }
     setGameStarted(false);
-    setTimerActive(false);
-    setTime(0);
+    setTimerActive(false); // Always deactivate timer on reset
+    setTime(0); // Always reset time on reset
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
@@ -410,8 +421,12 @@ const App = () => {
     >
       <Container maxW="container.xl">
         <VStack spacing={8} align="stretch">
-          <HStack justify="space-between" align="center">
-            <Box textAlign="center" flex="1">
+          <HStack 
+            align="center" 
+            position="relative" // Parent for absolute positioning
+            py={2} // Add some vertical padding if needed for alignment
+          >
+            <Box textAlign="center" width="100%"> {/* Header takes full width for centering */}
               <Heading as="h1" size="2xl" mb={4}>
                 Quranic Flashcards
               </Heading>
@@ -419,7 +434,12 @@ const App = () => {
                 Memorize the Quran with interactive flashcards
               </Text>
             </Box>
-            <HStack>
+            <HStack 
+              position="absolute" // Position auth buttons absolutely
+              top="50%" // Vertically center them roughly
+              right="0" 
+              transform="translateY(-50%)" // Fine-tune vertical centering
+            >
               {currentUser ? (
                 <>
                   <Text>Welcome, {currentUser}!</Text>
@@ -438,24 +458,28 @@ const App = () => {
             </HStack>
           </HStack>
 
-          <Box>
-            <Text mb={2}>Select Surah:</Text>
-            <Select value={selectedSurah || ''} onChange={handleSurahChange} placeholder="Select a Surah" isDisabled={gameStarted || isLoading}>
-              {sequence.map((surah) => (
-                <option key={surah.number} value={surah.number.toString()}>
-                  {surah.number}. {surah.name}
-                </option>
-              ))}
-            </Select>
+          <Box display="flex" justifyContent="center">
+            <HStack alignItems="center" spacing="4">
+              <Text whiteSpace="nowrap">Select Surah:</Text>
+              <Select maxWidth="350px" value={selectedSurah || ''} onChange={handleSurahChange} placeholder="Select a Surah" isDisabled={gameStarted || isLoading}>
+                {sequence.map((surah) => (
+                  <option key={surah.number} value={surah.number.toString()}>
+                    {surah.number}. {surah.name}
+                  </option>
+                ))}
+              </Select>
+              <Checkbox 
+                isChecked={stopwatchEnabled} 
+                onChange={(e) => setStopwatchEnabled(e.target.checked)}
+                isDisabled={gameStarted}
+                whiteSpace="nowrap"
+              >
+                Enable Stopwatch
+              </Checkbox>
+            </HStack>
           </Box>
 
-          {gameStarted && (
-            <Box textAlign="center">
-              <Text fontSize="2xl" fontWeight="bold">Time: {formatTime(time)}</Text>
-            </Box>
-          )}
-
-          <HStack spacing={4} justify="center">
+          <HStack spacing={4} justify="center" alignItems="center">
             {!gameStarted ? (
               <Button onClick={handleStartGame} colorScheme="green" leftIcon={<ArrowRightIcon />} isDisabled={!selectedSurah || isLoading}>
                 Start Game
@@ -472,6 +496,12 @@ const App = () => {
               Check Sequence
             </Button>
           </HStack>
+
+          {gameStarted && stopwatchEnabled && (
+            <Box textAlign="center">
+              <Text fontSize="2xl" fontWeight="bold">Time: {formatTime(time)}</Text>
+            </Box>
+          )}
 
           {gameStarted && (
             <>
@@ -498,6 +528,7 @@ const App = () => {
                         onSelect={() => handleCardSelect(card.id)}
                         id={card.id}
                         index={card.id}
+                        isFaceDown={card.isFaceDown}
                       />
                     </Box>
                   ))}

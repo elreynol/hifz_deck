@@ -186,9 +186,28 @@ const SequenceArea = ({ cards, onCardSelect, selectedCards, onCardDrop, totalCar
         flexDirection="row-reverse"
         flexWrap="nowrap"
         gap="1rem"
-        justifyContent="center"
+        justifyContent="flex-start"
         overflowX="auto"
         paddingY={4}
+        paddingBottom="1rem"
+        paddingLeft="2rem"
+        paddingRight="2rem"
+        sx={{
+          '&::-webkit-scrollbar': {
+            height: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            bg: colorMode === 'dark' ? 'gray.700' : 'gray.100',
+            borderRadius: '4px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            bg: colorMode === 'dark' ? 'gray.600' : 'gray.300',
+            borderRadius: '4px',
+            '&:hover': {
+              bg: colorMode === 'dark' ? 'gray.500' : 'gray.400',
+            },
+          },
+        }}
       >
         {Array.from({ length: totalCards }, (_, i) => i + 1).reverse().map((position) => {
           const card = cards.find(c => c.position === position);

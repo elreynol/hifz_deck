@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text, useColorMode } from '@chakra-ui/react';
 import { useDrag } from 'react-dnd';
 
-const Card = ({ ayah, isSelected, onSelect, id, index, onDoubleClick }) => {
+const Card = ({ ayah, isSelected, onSelect, id, index, onDoubleClick, isFaceDown }) => {
   const { colorMode } = useColorMode();
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'CARD',
@@ -51,14 +51,18 @@ const Card = ({ ayah, isSelected, onSelect, id, index, onDoubleClick }) => {
         touchAction: 'none',
       }}
     >
-      <Text
-        fontSize="xl"
-        textAlign="center"
-        color={colorMode === 'dark' ? 'white' : 'gray.800'}
-        dir="rtl"
-      >
-        {ayah}
-      </Text>
+      {isFaceDown ? (
+        <Text fontSize="4xl" color={colorMode === 'dark' ? 'gray.500' : 'gray.400'}>?</Text>
+      ) : (
+        <Text
+          fontSize="xl"
+          textAlign="center"
+          color={colorMode === 'dark' ? 'white' : 'gray.800'}
+          dir="rtl"
+        >
+          {ayah}
+        </Text>
+      )}
     </Box>
   );
 };

@@ -19,7 +19,7 @@ export function SequenceProvider({ children }) {
     const loadSurahs = async () => {
       console.log('Starting to load surahs...')
       try {
-        const response = await fetch('/juz_amma_surahs.json')
+        const response = await fetch('juz_amma_surahs.json')
         console.log('Fetch response:', response.status, response.statusText)
         
         if (!response.ok) {
