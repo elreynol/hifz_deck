@@ -494,7 +494,7 @@ const App = () => {
         setFailCount(0);
         setFeedbackCardId(null);
         setFeedbackStatus('idle');
-        setVisiblePoolIds([]);
+        setChoiceCards([]);
         if (timerRef.current) clearInterval(timerRef.current);
         if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
       }
