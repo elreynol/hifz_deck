@@ -22,6 +22,10 @@ const BadgeShelf = ({
   selectedJuz = 30,
   juzSectionsDone = 0,
   juzSectionsTotal = 0,
+  /** Override the heading (e.g. "Badges" on a public profile). */
+  title = 'Your badges',
+  /** When false, hide the juz' browsing meter (useful on other players' profiles). */
+  showJuzMeter = true,
 }) => {
   const { colorMode } = useColorMode();
   const earnedSet = new Set(earnedIds);
@@ -52,7 +56,7 @@ const BadgeShelf = ({
           fontWeight="600"
           color={isDark ? 'mist.100' : 'ink.800'}
         >
-          Your badges
+          {title}
         </Text>
         <HStack spacing={3} flexWrap="wrap">
           {currentStreak > 0 && (
@@ -63,9 +67,11 @@ const BadgeShelf = ({
           <Text fontSize="xs" color={isDark ? 'whiteAlpha.700' : 'mist.600'} fontWeight="600">
             Surahs {completedSurahs}/{TOTAL_SURAHS}
           </Text>
-          <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
-            Juz&apos; {completedJuzs}/{TOTAL_JUZS}
-          </Text>
+          {showJuzMeter && (
+            <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
+              Juz&apos; {completedJuzs}/{TOTAL_JUZS}
+            </Text>
+          )}
         </HStack>
       </Flex>
 
@@ -75,32 +81,36 @@ const BadgeShelf = ({
         size="xs"
         borderRadius="full"
         colorScheme="teal"
-        mb={2}
+        mb={showJuzMeter ? 2 : 3}
         bg={isDark ? 'whiteAlpha.200' : 'mist.200'}
         sx={{ '& > div': { bg: isDark ? 'ink.300' : 'ink.500' } }}
         aria-label={`Surahs completed ${completedSurahs} of ${TOTAL_SURAHS}`}
       />
 
       {/* Secondary: sections inside the juz' you're browsing */}
-      <Flex justify="space-between" align="center" mb={1}>
-        <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
-          Juz&apos; {selectedJuz} sections
-        </Text>
-        <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
-          {juzSectionsDone}/{juzSectionsTotal || '—'}
-        </Text>
-      </Flex>
-      <Progress
-        value={juzPercent}
-        size="xs"
-        borderRadius="full"
-        colorScheme="teal"
-        mb={3}
-        bg={isDark ? 'whiteAlpha.100' : 'mist.100'}
-        opacity={0.55}
-        sx={{ '& > div': { bg: isDark ? 'ink.400' : 'ink.400' } }}
-        aria-label={`Juz ${selectedJuz} sections ${juzSectionsDone} of ${juzSectionsTotal}`}
-      />
+      {showJuzMeter && (
+        <>
+          <Flex justify="space-between" align="center" mb={1}>
+            <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
+              Juz&apos; {selectedJuz} sections
+            </Text>
+            <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
+              {juzSectionsDone}/{juzSectionsTotal || '—'}
+            </Text>
+          </Flex>
+          <Progress
+            value={juzPercent}
+            size="xs"
+            borderRadius="full"
+            colorScheme="teal"
+            mb={3}
+            bg={isDark ? 'whiteAlpha.100' : 'mist.100'}
+            opacity={0.55}
+            sx={{ '& > div': { bg: isDark ? 'ink.400' : 'ink.400' } }}
+            aria-label={`Juz ${selectedJuz} sections ${juzSectionsDone} of ${juzSectionsTotal}`}
+          />
+        </>
+      )}
 
       <HStack
         spacing={3}

@@ -19,9 +19,11 @@ import UsernameSetupModal, {
 import BadgeShelf from './components/BadgeShelf';
 import AccountSettings from './components/AccountSettings';
 import PointsWeightingExplainer from './components/PointsWeightingExplainer';
+import LeaderboardUsernameLink from './components/LeaderboardUsernameLink';
 import { useSequence } from './context/SequenceContext';
 import { useAuth } from './context/AuthContext';
 import { supabase } from './supabaseClient';
+import { Link as RouterLink } from 'react-router-dom';
 import { computePoints } from './utils/scoring';
 import { buildChoicePool, shuffleArray } from './utils/buildChoicePool';
 import { BADGE_BY_ID } from './badges/badgeCatalog';
@@ -1726,6 +1728,9 @@ const App = () => {
               </Text>
               {user && (
                 <HStack spacing={1} display={{ base: 'flex', md: 'none' }} flexWrap="wrap" pt={1}>
+                  <Button as={RouterLink} to="/profile" size="xs" variant="ghost" colorScheme="teal">
+                    Profile
+                  </Button>
                   <Button onClick={onAccountSettingsOpen} size="xs" variant="ghost" colorScheme="teal">
                     Account
                   </Button>
@@ -1749,6 +1754,9 @@ const App = () => {
                   <Text fontSize="sm" noOfLines={1} maxW="160px" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
                     {user.email}
                   </Text>
+                  <Button as={RouterLink} to="/profile" size="sm" variant="ghost" colorScheme="teal">
+                    Profile
+                  </Button>
                   <Button onClick={onAccountSettingsOpen} size="sm" variant="ghost" colorScheme="teal">
                     Account
                   </Button>
@@ -2393,7 +2401,12 @@ const App = () => {
                             .map((entry, index) => (
                             <Tr key={index}>
                               <Td>{index + 1}</Td>
-                              <Td fontWeight={index < 3 ? '600' : '400'}>{entry.username || 'Anonymous'}</Td>
+                              <Td fontWeight={index < 3 ? '600' : '400'}>
+                                <LeaderboardUsernameLink
+                                  username={entry.username}
+                                  fontWeight={index < 3 ? '600' : '400'}
+                                />
+                              </Td>
                               <Td isNumeric>{entry.count}</Td>
                             </Tr>
                           ))
@@ -2440,7 +2453,9 @@ const App = () => {
                         return rows.map((row) => (
                           <Tr key={row.surahId}>
                             <Td>{row.name}</Td>
-                            <Td>{row.username || 'Anonymous'}</Td>
+                            <Td>
+                              <LeaderboardUsernameLink username={row.username} />
+                            </Td>
                             <Td isNumeric>{row.time}</Td>
                           </Tr>
                         ));
@@ -2472,7 +2487,12 @@ const App = () => {
                             .map((entry, index) => (
                               <Tr key={index}>
                                 <Td>{index + 1}</Td>
-                                <Td fontWeight={index < 3 ? '600' : '400'}>{entry.username || 'Anonymous'}</Td>
+                                <Td fontWeight={index < 3 ? '600' : '400'}>
+                                  <LeaderboardUsernameLink
+                                    username={entry.username}
+                                    fontWeight={index < 3 ? '600' : '400'}
+                                  />
+                                </Td>
                                 <Td isNumeric>{entry.points}</Td>
                               </Tr>
                             ))
