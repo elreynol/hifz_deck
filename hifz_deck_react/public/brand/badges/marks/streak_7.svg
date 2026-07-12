@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
+  <!-- Hifzer mark: streak_7 — Ink Path family -->
+  <g>
+      <path d="M11 28.5c3-8.5 7.5-13.5 13-16.2 5.5 2.7 10 7.7 13 16.2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="11.5" cy="27.8" r="2.3"/>
+      <circle cx="14.8" cy="20.6" r="2.3"/>
+      <circle cx="19.6" cy="15.2" r="2.3"/>
+      <circle cx="24" cy="12.8" r="2.3"/>
+      <circle cx="28.4" cy="15.2" r="2.3"/>
+      <circle cx="33.2" cy="20.6" r="2.3"/>
+      <circle cx="36.5" cy="27.8" r="2.3"/>
+      <rect x="16.5" y="33.8" width="15" height="2.8" rx="1.4" opacity="0.5"/>
+    </g>
+</svg>
