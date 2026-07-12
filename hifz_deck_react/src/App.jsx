@@ -1957,32 +1957,53 @@ const App = () => {
                 ) : (
                   <Button
                     onClick={handleShuffle}
-                    colorScheme="teal"
                     variant="outline"
+                    borderColor={colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
+                    color={colorMode === 'dark' ? 'mist.100' : 'ink.700'}
+                    _hover={{ borderColor: 'ink.400', bg: colorMode === 'dark' ? 'whiteAlpha.100' : 'mist.100' }}
                     isDisabled={!gameStarted}
                     size="sm"
                     w={{ base: '100%', sm: 'auto' }}
                   >
-                    Shuffle Choices
+                    Shuffle choices
                   </Button>
                 )}
                 <Button
                   onClick={handleReset}
                   variant="ghost"
-                  colorScheme="orange"
+                  color={colorMode === 'dark' ? 'whiteAlpha.700' : 'mist.600'}
+                  _hover={{ color: 'orange.400', bg: colorMode === 'dark' ? 'whiteAlpha.100' : 'mist.100' }}
                   leftIcon={<RepeatIcon />}
                   isDisabled={isLoading}
                   size="sm"
                   w={{ base: '100%', sm: 'auto' }}
                 >
-                  Reset Game
+                  Reset
                 </Button>
               </Stack>
             </VStack>
           </Box>
 
           {gameStarted && (
-            <VStack spacing={{ base: 1, md: 2 }} textAlign="center" py={{ base: 0, md: 0 }}>
+            <VStack
+              spacing={{ base: 1, md: 1.5 }}
+              textAlign="center"
+              py={{ base: 1, md: 1.5 }}
+              px={{ base: 2, md: 3 }}
+              w="100%"
+              borderRadius="lg"
+              bg={colorMode === 'dark' ? 'blackAlpha.200' : 'whiteAlpha.500'}
+              border="1px solid"
+              borderColor={
+                isElite
+                  ? colorMode === 'dark'
+                    ? 'elite.500'
+                    : 'elite.200'
+                  : colorMode === 'dark'
+                    ? 'whiteAlpha.100'
+                    : 'mist.100'
+              }
+            >
               {stopwatchEnabled && (
                 <Text fontFamily="heading" fontSize={{ base: 'xl', md: '2xl' }} fontWeight="600" color={colorMode === 'dark' ? 'mist.50' : 'ink.900'} lineHeight="1.2">
                   {formatTime(time)}
@@ -2070,8 +2091,14 @@ const App = () => {
                   })}
                 </SimpleGrid>
                 {unplacedCards.length === 0 && (
-                  <Text textAlign="center" color="ink.500" fontWeight="medium" py={{ base: 3, md: 4 }}>
-                    All ayahs completed!
+                  <Text
+                    textAlign="center"
+                    fontFamily="heading"
+                    color={colorMode === 'dark' ? 'elite.200' : 'ink.600'}
+                    fontWeight="600"
+                    py={{ base: 3, md: 4 }}
+                  >
+                    {playDirection === 'reverse' ? 'السابقون complete' : 'All ayahs completed'}
                   </Text>
                 )}
               </Box>
@@ -2254,9 +2281,9 @@ const App = () => {
                     <Table variant="simple" size="sm">
                       <Thead>
                         <Tr>
-                          <Th>Rank</Th>
-                          <Th>Username</Th>
-                          <Th isNumeric>Cleared</Th>
+                          <Th color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Rank</Th>
+                          <Th color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Username</Th>
+                          <Th isNumeric color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Cleared</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
@@ -2274,7 +2301,11 @@ const App = () => {
                             </Tr>
                           ))
                         ) : (
-                          <Tr><Td colSpan="3" color="gray.500">No data yet — finish a section to appear here.</Td></Tr>
+                          <Tr>
+                            <Td colSpan="3" color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} fontSize="sm">
+                              No data yet — finish a section to appear here.
+                            </Td>
+                          </Tr>
                         )}
                       </Tbody>
                     </Table>
@@ -2288,9 +2319,9 @@ const App = () => {
                   <Table variant="simple" size="sm">
                     <Thead>
                       <Tr>
-                        <Th>Surah</Th>
-                        <Th>Username</Th>
-                        <Th isNumeric>Seconds</Th>
+                        <Th color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Surah</Th>
+                        <Th color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Username</Th>
+                        <Th isNumeric color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Seconds</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -2303,7 +2334,9 @@ const App = () => {
                         if (rows.length === 0) {
                           return (
                             <Tr>
-                              <Td colSpan="3" color="gray.500">No times recorded yet.</Td>
+                              <Td colSpan="3" color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} fontSize="sm">
+                                No times recorded yet.
+                              </Td>
                             </Tr>
                           );
                         }
@@ -2325,13 +2358,13 @@ const App = () => {
                   </Text>
                   <TableContainer>
                     <Table variant="simple" size="sm">
-                      <Thead>
-                        <Tr>
-                          <Th>Rank</Th>
-                          <Th>Username</Th>
-                          <Th isNumeric>Points</Th>
-                        </Tr>
-                      </Thead>
+                        <Thead>
+                          <Tr>
+                            <Th color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Rank</Th>
+                            <Th color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Username</Th>
+                            <Th isNumeric color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}>Points</Th>
+                          </Tr>
+                        </Thead>
                       <Tbody>
                         {Array.isArray(leaderboardData.overallPoints) &&
                         leaderboardData.overallPoints.filter(
@@ -2347,7 +2380,11 @@ const App = () => {
                               </Tr>
                             ))
                         ) : (
-                          <Tr><Td colSpan="3" color="gray.500">No points yet.</Td></Tr>
+                          <Tr>
+                            <Td colSpan="3" color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} fontSize="sm">
+                              No points yet.
+                            </Td>
+                          </Tr>
                         )}
                       </Tbody>
                     </Table>

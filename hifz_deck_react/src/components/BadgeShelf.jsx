@@ -77,6 +77,7 @@ const BadgeShelf = ({
         colorScheme="teal"
         mb={2}
         bg={isDark ? 'whiteAlpha.200' : 'mist.200'}
+        sx={{ '& > div': { bg: isDark ? 'ink.300' : 'ink.500' } }}
         aria-label={`Surahs completed ${completedSurahs} of ${TOTAL_SURAHS}`}
       />
 
@@ -97,6 +98,7 @@ const BadgeShelf = ({
         mb={3}
         bg={isDark ? 'whiteAlpha.100' : 'mist.100'}
         opacity={0.55}
+        sx={{ '& > div': { bg: isDark ? 'ink.400' : 'ink.400' } }}
         aria-label={`Juz ${selectedJuz} sections ${juzSectionsDone} of ${juzSectionsTotal}`}
       />
 

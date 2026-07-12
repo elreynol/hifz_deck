@@ -1,8 +1,30 @@
 import React, { useState } from 'react';
 import {
-  Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, ModalFooter,
-  Button, Tabs, TabList, Tab, TabPanels, TabPanel, Box, Text, Heading,
-  FormControl, FormLabel, Input, VStack, useToast, Badge, Progress, HStack
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
+  Button,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
+  Box,
+  Text,
+  Heading,
+  FormControl,
+  FormLabel,
+  Input,
+  VStack,
+  useToast,
+  Badge,
+  Progress,
+  HStack,
+  useColorMode,
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
@@ -11,6 +33,10 @@ import BadgeShelf from './BadgeShelf';
 const REVERSE_UNLOCK_COUNT = 10;
 const ELITE_UNLOCK_COUNT = 3;
 
+/**
+ * Account modal — profile, security, and progress.
+ * Uses the same ink/mist soft-panel language as auth + leaderboard.
+ */
 const AccountSettings = ({
   isOpen,
   onClose,
@@ -27,6 +53,16 @@ const AccountSettings = ({
 }) => {
   const { user, session, updateUsername, updateUserPassword } = useAuth();
   const toast = useToast();
+  const { colorMode } = useColorMode();
+  const isDark = colorMode === 'dark';
+
+  const muted = isDark ? 'whiteAlpha.600' : 'mist.500';
+  const labelColor = isDark ? 'mist.100' : 'ink.700';
+  const headingColor = isDark ? 'mist.50' : 'ink.900';
+  const borderSoft = isDark ? 'whiteAlpha.200' : 'mist.200';
+  const inputBg = isDark ? 'blackAlpha.300' : 'white';
+  const inputBorder = isDark ? 'whiteAlpha.300' : 'mist.300';
+  const trackBg = isDark ? 'whiteAlpha.200' : 'mist.200';
 
   const [newUsernameInput, setNewUsernameInput] = useState('');
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
@@ -39,26 +75,38 @@ const AccountSettings = ({
 
   const handleUpdateUsername = async () => {
     if (!session || !session.access_token) {
-      toast({ title: 'Error', description: 'You must be logged in.', status: 'error', duration: 3000, isClosable: true });
+      toast({
+        title: 'Sign in required',
+        description: 'You must be logged in to change your username.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
       return;
     }
     if (newUsernameInput.trim().length < 3) {
-      toast({ title: 'Validation Error', description: 'New username must be at least 3 characters.', status: 'warning', duration: 3000, isClosable: true });
+      toast({
+        title: 'Username too short',
+        description: 'New username must be at least 3 characters.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
       return;
     }
 
     setIsUpdatingUsername(true);
 
     try {
-      const { data, error } = await updateUsername(newUsernameInput.trim());
+      const { error } = await updateUsername(newUsernameInput.trim());
 
       if (error) {
-          throw error;
+        throw error;
       }
-      
+
       toast({
-        title: 'Success',
-        description: `Username updated to ${newUsernameInput.trim()}`,
+        title: 'Username updated',
+        description: `You'll appear as ${newUsernameInput.trim()} on the leaderboard.`,
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -67,7 +115,7 @@ const AccountSettings = ({
       setNewUsernameInput('');
     } catch (error) {
       toast({
-        title: 'Update Failed',
+        title: 'Update failed',
         description: error.message,
         status: 'error',
         duration: 5000,
@@ -81,7 +129,7 @@ const AccountSettings = ({
   const handleUpdatePassword = async () => {
     if (newPassword.length < 6) {
       toast({
-        title: 'Validation Error',
+        title: 'Password too short',
         description: 'New password must be at least 6 characters.',
         status: 'warning',
         duration: 3000,
@@ -91,12 +139,12 @@ const AccountSettings = ({
     }
 
     setIsUpdatingPassword(true);
-    
+
     const { error } = await updateUserPassword(newPassword);
 
     if (error) {
       toast({
-        title: 'Update Failed',
+        title: 'Update failed',
         description: error.message,
         status: 'error',
         duration: 5000,
@@ -104,31 +152,31 @@ const AccountSettings = ({
       });
     } else {
       toast({
-        title: 'Success!',
-        description: 'Your password has been updated.',
+        title: 'Password updated',
+        description: 'Your password has been saved.',
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
       setNewPassword('');
     }
-    
+
     setIsUpdatingPassword(false);
   };
 
-  // When the modal opens, fetch the current username from the 'profiles' table.
+  // When the modal opens, fetch the current username from the profiles table.
   React.useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user) return;
 
-      setIsUpdatingUsername(true); // Use same loading state for initial fetch
+      setIsUpdatingUsername(true);
       try {
         const { data, error } = await supabase
           .from('profiles')
           .select('username')
           .eq('id', user.id)
           .single();
-        
+
         if (error) throw error;
 
         if (data) {
@@ -137,11 +185,11 @@ const AccountSettings = ({
           setCurrentProfileUsername('Not set');
         }
       } catch (error) {
-        console.error("Error fetching profile:", error);
+        console.error('Error fetching profile:', error);
         setCurrentProfileUsername('Could not load');
         toast({
-          title: 'Error',
-          description: 'Could not fetch your profile data.',
+          title: 'Could not load profile',
+          description: 'Try closing and reopening Account Settings.',
           status: 'error',
           duration: 4000,
           isClosable: true,
@@ -156,81 +204,169 @@ const AccountSettings = ({
     }
   }, [isOpen, user, toast]);
 
-  if (!user) return null; 
+  if (!user) return null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered>
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>Account Settings</ModalHeader>
+      <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(6px)" />
+      <ModalContent
+        bg={isDark ? 'ink.800' : 'mist.50'}
+        border="1px solid"
+        borderColor={borderSoft}
+        mx={3}
+      >
+        <ModalHeader fontFamily="heading" color={headingColor}>
+          Account Settings
+        </ModalHeader>
         <ModalCloseButton />
-        <ModalBody pb={6}>
-          <Tabs variant="enclosed-colored">
-            <TabList>
-              <Tab>Profile</Tab>
-              <Tab>Security</Tab>
-              <Tab>My Progress</Tab>
+        <ModalBody pb={4}>
+          <Tabs isFitted variant="soft-rounded" colorScheme="teal" size="sm">
+            <TabList
+              mb={3}
+              gap={1}
+              bg={isDark ? 'blackAlpha.300' : 'mist.100'}
+              p={1}
+              borderRadius="lg"
+            >
+              <Tab fontSize={{ base: 'xs', md: 'sm' }} borderRadius="md">
+                Profile
+              </Tab>
+              <Tab fontSize={{ base: 'xs', md: 'sm' }} borderRadius="md">
+                Security
+              </Tab>
+              <Tab fontSize={{ base: 'xs', md: 'sm' }} borderRadius="md">
+                Progress
+              </Tab>
             </TabList>
             <TabPanels>
-              <TabPanel>
-                <Heading size="md" mb={4}>Profile Information</Heading>
-                <Text mb={2}><strong>Email:</strong> {user.email}</Text>
-                <Text mb={4}><strong>Current Username:</strong> {currentProfileUsername}</Text>
-                
-                <Box mt={6} pt={4} borderTopWidth={1} borderColor="gray.200">
-                  <Heading size="sm" mb={3}>Change Username</Heading>
-                  <VStack spacing={3} align="stretch">
-                    <FormControl>
-                      <FormLabel htmlFor="acct-new-username">New Username</FormLabel>
-                      <Input
-                        id="acct-new-username"
-                        placeholder="Enter new username (min 3 chars)"
-                        value={newUsernameInput}
-                        onChange={(e) => setNewUsernameInput(e.target.value)}
-                        isDisabled={isUpdatingUsername}
-                      />
-                    </FormControl>
-                    <Button 
-                      colorScheme="purple" 
-                      onClick={handleUpdateUsername} 
-                      isLoading={isUpdatingUsername}
-                      alignSelf="flex-start"
+              <TabPanel px={0} pt={1}>
+                <VStack spacing={4} align="stretch">
+                  <Box>
+                    <Text fontSize="xs" color={muted} mb={0.5} fontWeight="600">
+                      Email
+                    </Text>
+                    <Text fontSize="sm" color={headingColor} noOfLines={1}>
+                      {user.email}
+                    </Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="xs" color={muted} mb={0.5} fontWeight="600">
+                      Public username
+                    </Text>
+                    <Text fontSize="sm" color={headingColor} fontWeight="600">
+                      {currentProfileUsername}
+                    </Text>
+                  </Box>
+
+                  <Box pt={3} borderTopWidth="1px" borderColor={borderSoft}>
+                    <Heading
+                      as="h3"
+                      size="sm"
+                      mb={1}
+                      fontFamily="heading"
+                      color={headingColor}
                     >
-                      Update Username
-                    </Button>
-                  </VStack>
-                </Box>
-                
-                <Text mt={4} mb={4}><strong>Avatar:</strong> {/* Placeholder */}</Text>
+                      Change username
+                    </Heading>
+                    <Text fontSize="xs" color={muted} mb={3}>
+                      This name appears on the leaderboard instead of your email.
+                    </Text>
+                    <VStack spacing={3} align="stretch">
+                      <FormControl>
+                        <FormLabel htmlFor="acct-new-username" fontSize="sm" color={labelColor} mb={1}>
+                          New username
+                        </FormLabel>
+                        <Input
+                          id="acct-new-username"
+                          placeholder="At least 3 characters"
+                          value={newUsernameInput}
+                          onChange={(e) => setNewUsernameInput(e.target.value)}
+                          isDisabled={isUpdatingUsername}
+                          bg={inputBg}
+                          borderColor={inputBorder}
+                          _hover={{ borderColor: isDark ? 'whiteAlpha.400' : 'ink.300' }}
+                          _focusVisible={{
+                            borderColor: 'ink.400',
+                            boxShadow: '0 0 0 1px var(--chakra-colors-ink-400)',
+                          }}
+                        />
+                      </FormControl>
+                      <Button
+                        bg="ink.600"
+                        color="white"
+                        _hover={{ bg: 'ink.700' }}
+                        onClick={handleUpdateUsername}
+                        isLoading={isUpdatingUsername}
+                        alignSelf="flex-start"
+                        size="sm"
+                      >
+                        Update username
+                      </Button>
+                    </VStack>
+                  </Box>
+                </VStack>
               </TabPanel>
-              <TabPanel>
-                <Heading size="md" mb={4}>Security Settings</Heading>
-                <VStack spacing={4}>
+
+              <TabPanel px={0} pt={1}>
+                <Heading
+                  as="h3"
+                  size="sm"
+                  mb={1}
+                  fontFamily="heading"
+                  color={headingColor}
+                >
+                  Change password
+                </Heading>
+                <Text fontSize="xs" color={muted} mb={4}>
+                  Choose a new password for email sign-in. Google accounts manage password elsewhere.
+                </Text>
+                <VStack spacing={3.5} align="stretch">
                   <FormControl>
-                    <FormLabel>New Password</FormLabel>
+                    <FormLabel fontSize="sm" color={labelColor} mb={1}>
+                      New password
+                    </FormLabel>
                     <Input
                       type="password"
-                      placeholder="Enter a new password"
+                      placeholder="At least 6 characters"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       isDisabled={isUpdatingPassword}
+                      bg={inputBg}
+                      borderColor={inputBorder}
+                      _hover={{ borderColor: isDark ? 'whiteAlpha.400' : 'ink.300' }}
+                      _focusVisible={{
+                        borderColor: 'ink.400',
+                        boxShadow: '0 0 0 1px var(--chakra-colors-ink-400)',
+                      }}
                     />
                   </FormControl>
                   <Button
-                    colorScheme="blue"
+                    bg="ink.600"
+                    color="white"
+                    _hover={{ bg: 'ink.700' }}
                     onClick={handleUpdatePassword}
                     isLoading={isUpdatingPassword}
                     loadingText="Updating..."
-                    w="100%"
+                    size="sm"
+                    alignSelf="flex-start"
                   >
-                    Update Password
+                    Update password
                   </Button>
                 </VStack>
               </TabPanel>
-              <TabPanel>
-                <Heading size="md" mb={4}>My Hifz Progress</Heading>
 
-                <Box mb={6}>
+              <TabPanel px={0} pt={1}>
+                <Heading
+                  as="h3"
+                  size="sm"
+                  mb={3}
+                  fontFamily="heading"
+                  color={headingColor}
+                >
+                  My Hifz progress
+                </Heading>
+
+                <Box mb={5}>
                   <BadgeShelf
                     earnedIds={earnedBadgeIds}
                     currentStreak={currentStreak}
@@ -244,26 +380,30 @@ const AccountSettings = ({
 
                 {isElite && (
                   <Box
-                    mb={6}
-                    p={4}
-                    borderRadius="md"
-                    bg="elite.50"
+                    mb={5}
+                    py={3}
+                    px={3}
+                    borderRadius="lg"
+                    borderTopWidth="3px"
+                    borderTopColor={isDark ? 'elite.300' : 'elite.500'}
                     borderWidth="1px"
-                    borderColor="elite.300"
+                    borderColor={isDark ? 'elite.700' : 'elite.200'}
+                    bg={isDark ? 'blackAlpha.300' : 'elite.50'}
                     textAlign="center"
                   >
                     <Badge
-                      colorScheme="yellow"
-                      fontSize="md"
+                      fontSize="sm"
                       px={3}
                       py={1}
                       mb={2}
                       bg="elite.500"
                       color="white"
+                      fontFamily="arabic"
+                      borderRadius="md"
                     >
                       السابقون
                     </Badge>
-                    <Text fontSize="sm" color="elite.700">
+                    <Text fontSize="sm" color={isDark ? 'elite.200' : 'elite.700'}>
                       Elite status — you have mastered the reverse path.
                     </Text>
                   </Box>
@@ -271,49 +411,57 @@ const AccountSettings = ({
 
                 <VStack spacing={5} align="stretch">
                   <Box>
-                    <HStack justify="space-between" mb={1}>
-                      <Text fontWeight="medium">Forward completions</Text>
-                      <Text fontSize="sm" color="gray.500">
+                    <HStack justify="space-between" mb={1.5}>
+                      <Text fontSize="sm" fontWeight="600" color={headingColor}>
+                        Forward completions
+                      </Text>
+                      <Text fontSize="xs" color={muted} fontWeight="600">
                         {Math.min(forwardCount, REVERSE_UNLOCK_COUNT)} / {REVERSE_UNLOCK_COUNT}
                       </Text>
                     </HStack>
                     <Progress
                       value={(Math.min(forwardCount, REVERSE_UNLOCK_COUNT) / REVERSE_UNLOCK_COUNT) * 100}
                       size="sm"
-                      colorScheme={reverseUnlocked ? 'green' : 'blue'}
                       borderRadius="full"
+                      colorScheme="teal"
+                      bg={trackBg}
+                      aria-label={`Forward completions ${Math.min(forwardCount, REVERSE_UNLOCK_COUNT)} of ${REVERSE_UNLOCK_COUNT}`}
                     />
-                    <Text fontSize="sm" mt={2} color="gray.600">
+                    <Text fontSize="sm" mt={2} color={isDark ? 'mist.200' : 'mist.600'}>
                       {reverseUnlocked
                         ? 'السابقون reverse path unlocked.'
                         : `Complete ${REVERSE_UNLOCK_COUNT - forwardCount} more surah(s) to unlock السابقون (reverse).`}
                     </Text>
-                    <Text fontSize="xs" mt={1} color="gray.500">
+                    <Text fontSize="xs" mt={1} color={muted}>
                       Total forward surahs completed: {forwardCount}
                     </Text>
                   </Box>
 
                   <Box>
-                    <HStack justify="space-between" mb={1}>
-                      <Text fontWeight="medium">Reverse completions</Text>
-                      <Text fontSize="sm" color="gray.500">
+                    <HStack justify="space-between" mb={1.5}>
+                      <Text fontSize="sm" fontWeight="600" color={headingColor}>
+                        Reverse completions
+                      </Text>
+                      <Text fontSize="xs" color={muted} fontWeight="600">
                         {Math.min(reverseCount, ELITE_UNLOCK_COUNT)} / {ELITE_UNLOCK_COUNT}
                       </Text>
                     </HStack>
                     <Progress
                       value={(Math.min(reverseCount, ELITE_UNLOCK_COUNT) / ELITE_UNLOCK_COUNT) * 100}
                       size="sm"
-                      colorScheme={isElite ? 'yellow' : 'orange'}
                       borderRadius="full"
+                      colorScheme={isElite ? 'yellow' : 'teal'}
+                      bg={trackBg}
+                      aria-label={`Reverse completions ${Math.min(reverseCount, ELITE_UNLOCK_COUNT)} of ${ELITE_UNLOCK_COUNT}`}
                     />
-                    <Text fontSize="sm" mt={2} color="gray.600">
+                    <Text fontSize="sm" mt={2} color={isDark ? 'mist.200' : 'mist.600'}>
                       {isElite
                         ? 'السابقون Elite unlocked app-wide.'
                         : reverseUnlocked
                           ? `Complete ${ELITE_UNLOCK_COUNT - reverseCount} more reverse surah(s) for Elite.`
                           : 'Unlock reverse mode first, then complete 3 surahs backwards.'}
                     </Text>
-                    <Text fontSize="xs" mt={1} color="gray.500">
+                    <Text fontSize="xs" mt={1} color={muted}>
                       Total reverse surahs completed: {reverseCount}
                     </Text>
                   </Box>
@@ -323,7 +471,14 @@ const AccountSettings = ({
           </Tabs>
         </ModalBody>
         <ModalFooter>
-          <Button onClick={onClose}>Close</Button>
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            color={isDark ? 'whiteAlpha.700' : 'mist.600'}
+            size="sm"
+          >
+            Close
+          </Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
