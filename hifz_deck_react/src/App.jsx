@@ -12,6 +12,10 @@ import Card from './components/Card';
 import SequenceArea from './components/SequenceArea';
 import AppBackground from './components/AppBackground';
 import LoginForm from './components/auth/LoginForm';
+import GoogleSignInButton from './components/auth/GoogleSignInButton';
+import UsernameSetupModal, {
+  needsPublicUsername,
+} from './components/auth/UsernameSetupModal';
 import BadgeShelf from './components/BadgeShelf';
 import AccountSettings from './components/AccountSettings';
 import PointsWeightingExplainer from './components/PointsWeightingExplainer';
@@ -390,6 +394,8 @@ const App = () => {
   const [usernameInput, setUsernameInput] = useState('');
   // Public name for leaderboards — never the email address
   const [profileUsername, setProfileUsername] = useState(null);
+  const [needsUsernameSetup, setNeedsUsernameSetup] = useState(false);
+  const [usernameDraft, setUsernameDraft] = useState('');
 
   // Leaderboard state (includes reverse / السابقون progress)
   const { isOpen: isLeaderboardModalOpen, onOpen: onLeaderboardModalOpen, onClose: onLeaderboardModalClose } = useDisclosure();
@@ -447,8 +453,13 @@ const App = () => {
   useEffect(() => {
     if (!user) {
       setProfileUsername(null);
+      setNeedsUsernameSetup(false);
+      setUsernameDraft('');
       return;
     }
+
+    // Close login modal after OAuth / email session is live
+    if (isAuthModalOpen) onAuthModalClose();
 
     let cancelled = false;
     (async () => {
@@ -459,8 +470,13 @@ const App = () => {
           .eq('id', user.id)
           .maybeSingle();
         if (cancelled) return;
-        const name = displayNameForUser(data?.username, user);
+        if (error) throw error;
+
+        const rawUsername = data?.username || null;
+        const name = displayNameForUser(rawUsername, user);
         setProfileUsername(name);
+        setUsernameDraft(rawUsername && !looksLikeEmail(rawUsername) ? rawUsername : '');
+        setNeedsUsernameSetup(needsPublicUsername(rawUsername));
 
         if (data?.current_streak != null) {
           setCurrentStreak(Number(data.current_streak) || 0);
@@ -495,6 +511,7 @@ const App = () => {
         console.error('Failed to load profile username:', err);
         if (!cancelled) {
           setProfileUsername(displayNameForUser(null, user));
+          setNeedsUsernameSetup(true);
         }
       }
     })();
@@ -2061,6 +2078,22 @@ const App = () => {
         juzSectionsTotal={selectedJuzProgress.total}
       />
 
+      <UsernameSetupModal
+        isOpen={!!user && needsUsernameSetup}
+        initialUsername={usernameDraft}
+        onClose={() => setNeedsUsernameSetup(false)}
+        onSaved={(name) => {
+          setProfileUsername(name);
+          setUsernameDraft(name);
+          setNeedsUsernameSetup(false);
+          setLeaderboardData((prev) => {
+            const cleaned = consolidateLeaderboardIdentity(prev, [user?.email], name);
+            localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(cleaned));
+            return cleaned;
+          });
+        }}
+      />
+
       <Modal isOpen={isAuthModalOpen} onClose={() => { onAuthModalClose(); setEmailInput(''); setPasswordInput(''); setUsernameInput(''); }} isCentered>
         <ModalOverlay />
         <ModalContent bg={colorMode === 'dark' ? 'gray.700' : 'white'}>
@@ -2068,7 +2101,11 @@ const App = () => {
           <ModalCloseButton />
           <ModalBody pb={6}>
             {isSigningUp ? (
-              <>
+              <VStack spacing={4} align="stretch">
+                <GoogleSignInButton label="Sign up with Google" />
+                <Text fontSize="xs" color="gray.500" textAlign="center">
+                  Or create an account with email
+                </Text>
                 <FormControl isRequired>
                   <FormLabel>Email</FormLabel>
                   <Input
@@ -2079,7 +2116,7 @@ const App = () => {
                     isDisabled={authLoading}
                   />
                 </FormControl>
-                <FormControl mt={4} isRequired>
+                <FormControl isRequired>
                   <FormLabel>Password</FormLabel>
                   <Input
                     placeholder="Create a password"
@@ -2089,7 +2126,7 @@ const App = () => {
                     isDisabled={authLoading}
                   />
                 </FormControl>
-                <FormControl isRequired mb={3}>
+                <FormControl isRequired>
                   <FormLabel>Username</FormLabel>
                   <Input
                     placeholder="Choose a username (min 3 chars)"
@@ -2099,7 +2136,7 @@ const App = () => {
                     isDisabled={authLoading}
                   />
                 </FormControl>
-              </>
+              </VStack>
             ) : (
               <LoginForm />
             )}

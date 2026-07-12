@@ -2,13 +2,16 @@ import React, { useState } from 'react'
 import {
   Box,
   Button,
+  Divider,
   FormControl,
   FormLabel,
   Input,
+  Text,
   VStack,
   useToast,
 } from '@chakra-ui/react'
 import { useAuth } from '../../context/AuthContext'
+import GoogleSignInButton from './GoogleSignInButton'
 
 export default function LoginForm() {
   const { login, sendPasswordResetEmail, loading: authLoading } = useAuth()
@@ -73,36 +76,43 @@ export default function LoginForm() {
   };
 
   return (
-    <Box p={8} maxWidth="500px" borderWidth={1} borderRadius={8} boxShadow="lg">
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4}>
-          <FormControl isRequired>
-            <FormLabel>Email</FormLabel>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              isDisabled={authLoading}
-            />
-          </FormControl>
-          <FormControl isRequired>
-            <FormLabel>Password</FormLabel>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              isDisabled={authLoading}
-            />
-          </FormControl>
-          <Button type="submit" colorScheme="blue" width="full" isLoading={authLoading}>
-            Login
-          </Button>
-          <Button variant="link" size="sm" onClick={handleForgotPassword}>
-            Forgot your password?
-          </Button>
-        </VStack>
-      </form>
+    <Box p={2} maxWidth="500px" w="100%">
+      <VStack spacing={4} align="stretch">
+        <GoogleSignInButton />
+        <Divider />
+        <Text fontSize="xs" color="gray.500" textAlign="center">
+          Or continue with email
+        </Text>
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={4}>
+            <FormControl isRequired>
+              <FormLabel>Email</FormLabel>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                isDisabled={authLoading}
+              />
+            </FormControl>
+            <FormControl isRequired>
+              <FormLabel>Password</FormLabel>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                isDisabled={authLoading}
+              />
+            </FormControl>
+            <Button type="submit" colorScheme="teal" width="full" isLoading={authLoading}>
+              Login
+            </Button>
+            <Button variant="link" size="sm" onClick={handleForgotPassword}>
+              Forgot your password?
+            </Button>
+          </VStack>
+        </form>
+      </VStack>
     </Box>
   )
-} 
+}
