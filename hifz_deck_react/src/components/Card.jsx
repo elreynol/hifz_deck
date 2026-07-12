@@ -37,7 +37,7 @@ const Card = ({ ayah, status = 'idle', onTap, isFaceDown, readOnly = false, isEl
 
   return (
     <Box
-      p={{ base: 3, md: 5 }}
+      p={{ base: 2, md: 3 }}
       bg={getBg()}
       borderRadius="lg"
       boxShadow={readOnly ? 'soft' : 'panel'}
@@ -82,12 +82,15 @@ const Card = ({ ayah, status = 'idle', onTap, isFaceDown, readOnly = false, isEl
         </Text>
       ) : (
         <Text
-          fontSize={{ base: 'md', md: 'xl' }}
-          lineHeight={{ base: '1.55', md: '1.7' }}
+          fontSize={{ base: 'lg', md: '2xl' }}
+          lineHeight={{ base: '1.45', md: '1.55' }}
           textAlign="center"
           color={isDark ? 'mist.50' : 'ink.900'}
           dir="rtl"
           fontFamily="arabic"
+          overflowWrap="break-word"
+          wordBreak="break-word"
+          maxW="100%"
         >
           {ayah}
         </Text>
