@@ -1011,17 +1011,59 @@ const App = () => {
             updateLeaderboards(boardKey, elapsedSeconds, pointsEarned);
           }
         } else {
-          // Guests: one summary toast (logged-in path toasts inside update*Leaderboards)
+          // Anonymous visitor: summary + invite to open the public leaderboard
+          const summary = buildRunSummaryDescription({
+            recordedTime,
+            pointsEarned,
+          });
+          const nudgeKey = 'hifzDeckLeaderboardNudgeShown';
+          let showLeaderboardNudge = false;
+          try {
+            showLeaderboardNudge = !sessionStorage.getItem(nudgeKey);
+            if (showLeaderboardNudge) sessionStorage.setItem(nudgeKey, '1');
+          } catch {
+            showLeaderboardNudge = true;
+          }
+
           toast({
-            title: playDirection === 'reverse' ? 'السابقون complete' : 'Section complete',
-            description: buildRunSummaryDescription({
-              recordedTime,
-              pointsEarned,
-            }),
-            status: 'success',
-            duration: 5000,
-            isClosable: true,
             position: 'top',
+            duration: showLeaderboardNudge ? 10000 : 5000,
+            isClosable: true,
+            render: ({ onClose }) => (
+              <Box
+                bg={colorMode === 'dark' ? 'ink.800' : 'mist.50'}
+                color={colorMode === 'dark' ? 'mist.50' : 'ink.900'}
+                border="1px solid"
+                borderColor={colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.200'}
+                borderRadius="lg"
+                boxShadow="soft"
+                p={4}
+                maxW="sm"
+              >
+                <Text fontFamily="heading" fontWeight="600" fontSize="md">
+                  {playDirection === 'reverse' ? 'السابقون complete' : 'Section complete'}
+                </Text>
+                <Text fontSize="sm" mt={1} color={colorMode === 'dark' ? 'whiteAlpha.700' : 'mist.600'}>
+                  {summary}
+                </Text>
+                {showLeaderboardNudge && (
+                  <Button
+                    mt={3}
+                    size="sm"
+                    bg="ink.600"
+                    color="white"
+                    leftIcon={<StarIcon />}
+                    _hover={{ bg: 'ink.700' }}
+                    onClick={() => {
+                      onLeaderboardModalOpen();
+                      onClose();
+                    }}
+                  >
+                    See the leaderboard
+                  </Button>
+                )}
+              </Box>
+            ),
           });
         }
       } else {
@@ -1804,15 +1846,25 @@ const App = () => {
                 {/* Mobile: keep theme + auth actions beside the brand */}
                 <HStack spacing={1} display={{ base: 'flex', md: 'none' }}>
                   {!user && (
-                    <Button
-                      onClick={() => { setIsSigningUp(false); onAuthModalOpen(); }}
-                      size="xs"
-                      bg="ink.600"
-                      color="white"
-                      _hover={{ bg: 'ink.700' }}
-                    >
-                      Login
-                    </Button>
+                    <>
+                      <IconButton
+                        icon={<StarIcon />}
+                        onClick={onLeaderboardModalOpen}
+                        size="sm"
+                        aria-label="Open Leaderboard"
+                        variant="ghost"
+                        colorScheme="teal"
+                      />
+                      <Button
+                        onClick={() => { setIsSigningUp(false); onAuthModalOpen(); }}
+                        size="xs"
+                        bg="ink.600"
+                        color="white"
+                        _hover={{ bg: 'ink.700' }}
+                      >
+                        Login
+                      </Button>
+                    </>
                   )}
                   <IconButton
                     icon={colorMode === 'dark' ? <SunIcon /> : <MoonIcon />}
@@ -1888,15 +1940,25 @@ const App = () => {
                   />
                 </>
               ) : (
-                <Button
-                  onClick={() => { setIsSigningUp(false); onAuthModalOpen(); }}
-                  size="sm"
-                  bg="ink.600"
-                  color="white"
-                  _hover={{ bg: 'ink.700' }}
-                >
-                  Login / Sign Up
-                </Button>
+                <HStack spacing={2}>
+                  <IconButton
+                    icon={<StarIcon />}
+                    onClick={onLeaderboardModalOpen}
+                    size="sm"
+                    aria-label="Open Leaderboard"
+                    variant="ghost"
+                    colorScheme="teal"
+                  />
+                  <Button
+                    onClick={() => { setIsSigningUp(false); onAuthModalOpen(); }}
+                    size="sm"
+                    bg="ink.600"
+                    color="white"
+                    _hover={{ bg: 'ink.700' }}
+                  >
+                    Login / Sign Up
+                  </Button>
+                </HStack>
               )}
               <IconButton
                 icon={colorMode === 'dark' ? <SunIcon /> : <MoonIcon />}
