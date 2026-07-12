@@ -1,6 +1,8 @@
-# Hifz Deck
+# Hifzer
 
 Practice ayah ordering across the Quran — pick a juz', hizb, and surah, then tap verses in order.
+
+(Formerly “Hifz Deck.” The GitHub Pages path remains `/hifz_deck/` for now.)
 
 ## Verse data & attribution
 
@@ -24,6 +26,8 @@ Live site: https://elreynol.github.io/hifz_deck/
 ## Google sign-in setup
 
 The app already calls `supabase.auth.signInWithOAuth({ provider: 'google' })`. You still need to turn Google on in Google Cloud + Supabase.
+
+In Google Auth Platform → Branding, set the **app name** to **Hifzer** (and add a logo if you want). That improves the consent screen; the “continue to …supabase.co” host only changes with a Supabase custom domain.
 
 ### 1. Supabase → Authentication → URL Configuration
 
