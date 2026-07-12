@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
+  <!-- Hifzer mark: streak_3 — Ink Path family -->
+  <g>
+      <path d="M13.8 30.8 L20.8 19.2 L22.2 20 L15.2 31.6z" opacity="0.85"/>
+      <path d="M29.2 30.8 L22.2 19.2 L20.8 20 L27.8 31.6z" opacity="0.85"/>
+      <circle cx="13" cy="31.5" r="3.2"/>
+      <circle cx="21.5" cy="18.5" r="3.2"/>
+      <circle cx="30" cy="31.5" r="3.2"/>
+    </g>
+</svg>

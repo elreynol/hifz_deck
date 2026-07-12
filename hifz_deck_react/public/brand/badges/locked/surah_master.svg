@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="surah_master">
+  <circle cx="32" cy="32" r="30" fill="#6a7471"/>
+  <circle cx="32" cy="32" r="30" fill="none" stroke="#c5d0cd" stroke-width="1.75" opacity="0.28"/>
+  <circle cx="32" cy="32" r="25.25" fill="none" stroke="#e8eeec" stroke-width="1.1" opacity="0.12"/>
+  <g transform="translate(8 8)" fill="#c5d0cd" opacity="0.75">
+    
+      <path d="M9.5 31l4.4-13.8 5.9 7.4L24 10.5l4.2 14.1 5.9-7.4L38.5 31H9.5z"/>
+      <rect x="12" y="33.2" width="24" height="3.4" rx="1.7"/>
+    
+  </g>
+</svg>
