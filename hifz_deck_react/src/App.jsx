@@ -1760,7 +1760,7 @@ const App = () => {
         <AppBackground />
         <VStack position="relative" zIndex={1} spacing={3}>
           <Image
-            src="/hifz_deck/brand/hifzer-app-icon.png"
+            src="/brand/hifzer-app-icon.png"
             alt=""
             boxSize={{ base: '56px', md: '72px' }}
             borderRadius="xl"
@@ -1814,7 +1814,7 @@ const App = () => {
               >
                 <HStack spacing={2.5} align="center" flexWrap="wrap">
                   <Image
-                    src="/hifz_deck/brand/hifzer-app-icon.png"
+                    src="/brand/hifzer-app-icon.png"
                     alt=""
                     boxSize={{ base: '36px', md: '48px' }}
                     borderRadius="lg"
@@ -2436,7 +2436,7 @@ const App = () => {
           <ModalHeader pb={2}>
             <HStack spacing={3}>
               <Image
-                src="/hifz_deck/brand/hifzer-app-icon.png"
+                src="/brand/hifzer-app-icon.png"
                 alt=""
                 boxSize="36px"
                 borderRadius="md"
