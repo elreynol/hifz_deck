@@ -111,13 +111,24 @@ async function main() {
         primary = r.surah;
       }
     }
+    // Special case: For hizb 60 (Juz Amma), default to Surah 114 (An-Nas)
+    // This is the most common starting point for beginners learning Juz Amma
+    if (hizb === 60) {
+      primary = 114;
+    }
     const juz = verseIndex.find((v) => v.hizb === hizb)?.juz || Math.ceil(hizb / 2);
     hizbs[hizbStr] = { number: hizb, juz, primarySurah: primary, ranges };
   }
 
   const juzs = {};
   for (let j = 1; j <= 30; j++) {
-    const hz = [...(juzHizbs[j] || [])].sort((a, b) => a - b);
+    let hz = [...(juzHizbs[j] || [])].sort((a, b) => a - b);
+    // Special case: For Juz 30 (Juz Amma), reverse the hizb order
+    // so that hizb 60 (containing Surah 114) comes first
+    // This aligns with the common pedagogical approach of starting from the end
+    if (j === 30) {
+      hz = hz.reverse();
+    }
     juzs[String(j)] = {
       number: j,
       hizbs: hz.length ? hz : [j * 2 - 1, j * 2],
