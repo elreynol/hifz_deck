@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
+  <!-- Hifzer mark: first_juz — Ink Path family -->
+  <g>
+      <path d="M22.5 11C18.2 12.8 14 13.2 11.5 13.2v22c2.5 0 6.7-.4 11-2.2V11z"/>
+      <path d="M25.5 11c4.3 1.8 8.5 2.2 11 2.2v22c-2.5 0-6.7-.4-11-2.2V11z"/>
+      <rect x="22.5" y="11" width="3" height="24.2" rx="0.8" opacity="0.3"/>
+    </g>
+</svg>

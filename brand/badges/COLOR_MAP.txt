@@ -1,0 +1,12 @@
+Ink Path badge colors (keep in badgeCatalog.js):
+  first_surah: '#3a7d74',
+  first_juz: '#4a6b8a',
+  juz_amma: '#9a7b24',
+  persistent_pb: '#b8922e',
+  experienced_initiate: '#27514c',
+  five_card_ace: '#549a90',
+  streak_3: '#c9a84a',
+  streak_7: '#7a611c',
+  surah_master: '#2d645d',
+  sabiqoon: '#b8922e',
+  elite: '#9a7b24',
