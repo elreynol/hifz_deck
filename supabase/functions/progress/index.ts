@@ -1,193 +1,202 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
-// Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-// console.log("Progress function initializing");
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS', // Ensure OPTIONS is here
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// Helper function to create a Supabase client with the user's JWT
-// This is important because inserts/updates should be done by the user themselves, respecting RLS.
-async function getSupabaseClientWithUserToken(req: Request): Promise<SupabaseClient | Response> {
-  const authHeader = req.headers.get('Authorization');
+const CARD_MULT: Record<number, number> = { 3: 1.0, 4: 1.25, 5: 1.5 }
+const LEVEL_MULT: Record<string, number> = { beginner: 1.0, experienced: 1.75 }
+const DIRECTION_MULT: Record<string, number> = { forward: 1.0, reverse: 1.5 }
+
+function computePoints(opts: {
+  ayahCount: number
+  durationSeconds: number
+  cardCount: number
+  difficulty: string
+  playDirection: string
+  stopwatchEnabled: boolean
+}) {
+  const ayahs = Math.max(1, opts.ayahCount || 1)
+  const duration = Math.max(1, Math.round(opts.durationSeconds || 1))
+  const cardMult = CARD_MULT[opts.cardCount] ?? 1.0
+  const levelMult = LEVEL_MULT[opts.difficulty] ?? 1.0
+  const directionMult = DIRECTION_MULT[opts.playDirection] ?? 1.0
+  if (!opts.stopwatchEnabled) {
+    return Math.round(ayahs * 10 * cardMult * levelMult * directionMult)
+  }
+  return Math.round(((ayahs * 100) / duration) * cardMult * levelMult * directionMult)
+}
+
+async function getSupabaseClientWithUserToken(req: Request) {
+  const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
     return new Response(JSON.stringify({ error: 'Missing Authorization header.' }), {
       status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
-  const token = authHeader.replace(/^Bearer\s+/, '');
+  const token = authHeader.replace(/^Bearer\s+/, '')
   if (!token) {
     return new Response(JSON.stringify({ error: 'Malformed Authorization header. Token is missing.' }), {
       status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("SUPABASE_URL or SUPABASE_ANON_KEY not found for progress function (client creation).");
-    return new Response(JSON.stringify({ error: "Server configuration error." }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-    });
+    return new Response(JSON.stringify({ error: 'Server configuration error.' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
-  // Create a temporary client to validate the token and get user info
-  // We use the anon key here because this client is just for getUser()
-  const tempClient = createClient(supabaseUrl, supabaseAnonKey);
-  const { data: { user }, error: userError } = await tempClient.auth.getUser(token);
+  const tempClient = createClient(supabaseUrl, supabaseAnonKey)
+  const { data: { user }, error: userError } = await tempClient.auth.getUser(token)
 
-  if (userError) {
-    console.error('JWT validation error (getUser):', userError.message);
-    return new Response(JSON.stringify({ error: userError.message || 'Invalid token.' }), {
+  if (userError || !user) {
+    return new Response(JSON.stringify({ error: userError?.message || 'Invalid token.' }), {
       status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
-  if (!user) {
-    return new Response(JSON.stringify({ error: 'No user found for the provided token.' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-    });
-  }
-
-  // Now, create a new Supabase client scoped to this specific user's session.
-  // This client will use the user's JWT for its requests, enforcing RLS.
-  // Note: The `createClient` function from `supabase-js` v2 automatically handles this
-  // if you pass the `auth.jwt` option OR if you set the Authorization header on the client instance.
-  // For Edge Functions, a common pattern is to create a client and then set the auth header for it.
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-  
-  // Attach user to the client object or return it alongside for easier access in the main handler
-  // For simplicity, we can just return the user-scoped client and the user object separately.
-  return { client: supabase, user: user }; 
+  })
+
+  return { client: supabase, user }
 }
 
-
 Deno.serve(async (req) => {
-  // Handle OPTIONS preflight request FIRST
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
-  // Validate request method (must be POST for this function)
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method Not Allowed. Please use POST.' }), {
       status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
-  // 2. Get user-scoped Supabase client and user object
-  const clientResult = await getSupabaseClientWithUserToken(req);
-  if (clientResult instanceof Response) {
-    return clientResult; // Return the error response from the helper
-  }
-  const { client: supabase, user } = clientResult;
-  // console.log("Authenticated user:", user.id);
+  const clientResult = await getSupabaseClientWithUserToken(req)
+  if (clientResult instanceof Response) return clientResult
+  const { client: supabase, user } = clientResult
 
-  // 3. Parse request body for surah_id and duration_seconds
-  let surah_id: number;
-  let duration_seconds: number;
+  let body: Record<string, unknown>
   try {
-    const body = await req.json();
-    surah_id = parseInt(body.surah_id, 10);
-    duration_seconds = parseInt(body.duration_seconds, 10);
-
-    if (isNaN(surah_id) || isNaN(duration_seconds)) {
-      return new Response(JSON.stringify({ error: 'surah_id and duration_seconds must be numbers.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-      });
-    }
-    if (surah_id <= 0 || duration_seconds <= 0) {
-        return new Response(JSON.stringify({ error: 'surah_id and duration_seconds must be positive.' }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-        });
-    }
-  } catch (error) {
-    console.error("Error parsing request body for progress:", error);
-    return new Response(JSON.stringify({ error: 'Invalid request body. Expected JSON with surah_id and duration_seconds.' }), {
+    body = await req.json()
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid request body.' }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
-  // 4. Insert progress into `completed_surahs` table
+  const surah_id = parseInt(String(body.surah_id), 10)
+  const duration_seconds = Math.max(1, parseInt(String(body.duration_seconds), 10) || 0)
+  const ayah_count = Math.max(1, parseInt(String(body.ayah_count ?? 1), 10) || 1)
+  const card_count = [3, 4, 5].includes(Number(body.card_count)) ? Number(body.card_count) : 5
+  const difficulty = body.difficulty === 'experienced' ? 'experienced' : 'beginner'
+  const play_direction = body.play_direction === 'reverse' ? 'reverse' : 'forward'
+  const stopwatch_enabled = body.stopwatch_enabled !== false
+  const juz = body.juz != null ? parseInt(String(body.juz), 10) : null
+  const hizb = body.hizb != null ? parseInt(String(body.hizb), 10) : null
+  const ayah_start = body.ayah_start != null ? parseInt(String(body.ayah_start), 10) : null
+  const ayah_end = body.ayah_end != null ? parseInt(String(body.ayah_end), 10) : null
+  const badge_ids = Array.isArray(body.badge_ids)
+    ? body.badge_ids.filter((id) => typeof id === 'string')
+    : []
+  const current_streak = Math.max(0, parseInt(String(body.current_streak ?? 0), 10) || 0)
+  const last_play_date = typeof body.last_play_date === 'string' ? body.last_play_date : null
+
+  if (isNaN(surah_id) || surah_id <= 0) {
+    return new Response(JSON.stringify({ error: 'surah_id must be a positive number.' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const points = computePoints({
+    ayahCount: ayah_count,
+    durationSeconds: duration_seconds,
+    cardCount: card_count,
+    difficulty,
+    playDirection: play_direction,
+    stopwatchEnabled: stopwatch_enabled,
+  })
+
   try {
+    const insertRow: Record<string, unknown> = {
+      user_id: user.id,
+      surah_id,
+      duration_seconds,
+      difficulty,
+      card_count,
+      play_direction,
+      points,
+    }
+    if (juz != null && !isNaN(juz)) insertRow.juz = juz
+    if (hizb != null && !isNaN(hizb)) insertRow.hizb = hizb
+    if (ayah_start != null && !isNaN(ayah_start)) insertRow.ayah_start = ayah_start
+    if (ayah_end != null && !isNaN(ayah_end)) insertRow.ayah_end = ayah_end
+
     const { data, error: insertError } = await supabase
       .from('completed_surahs')
-      .insert({
-        user_id: user.id, // Use the authenticated user's ID
-        surah_id: surah_id,
-        duration_seconds: duration_seconds,
-        // completed_at is handled by `now()` default in the table
-      })
-      .select(); // Optionally select the inserted row to return it
+      .insert(insertRow)
+      .select()
 
     if (insertError) {
-      console.error('Supabase insert error for progress:', insertError);
-      // Handle potential RLS errors or other database errors
-      let statusCode = 500;
-      if (insertError.code) {
-        if (insertError.code.startsWith('23')) { // Integrity constraint violation (e.g., foreign key, unique)
-            statusCode = 409; // Conflict
-        } else if (insertError.code.startsWith('PGRST')) { // PostgREST specific errors
-            statusCode = 400; // Or more specific based on PGRST error code
-        }
-      }
-      return new Response(JSON.stringify({ 
-        error: "Failed to record progress.",
-        details: insertError.message
+      return new Response(JSON.stringify({
+        error: 'Failed to record progress.',
+        details: insertError.message,
       }), {
-        status: statusCode,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-      });
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    // 5. Return success response (optionally with the created record)
-    return new Response(JSON.stringify({
-      message: "Progress recorded successfully!",
-      recorded_progress: data ? data[0] : null // .select() returns an array
-    }), {
-      status: 201, // Created
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS (original was incomplete)
-    });
+    if (last_play_date) {
+      await supabase
+        .from('profiles')
+        .update({
+          last_play_date,
+          current_streak,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+    }
 
+    if (badge_ids.length > 0) {
+      const rows = badge_ids.map((badge_id: string) => ({
+        user_id: user.id,
+        badge_id,
+      }))
+      await supabase.from('user_badges').upsert(rows, {
+        onConflict: 'user_id,badge_id',
+        ignoreDuplicates: true,
+      })
+    }
+
+    return new Response(JSON.stringify({
+      message: 'Progress recorded successfully!',
+      recorded_progress: data ? data[0] : null,
+      points,
+    }), {
+      status: 201,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   } catch (err) {
-    console.error('Unexpected error in progress function:', err);
+    console.error('Unexpected error in progress function:', err)
     return new Response(JSON.stringify({ error: 'An unexpected server error occurred.' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, // Add CORS
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 })
-
-/*
-Test with curl:
-
-(First, get an access_token by calling the login function)
-ACCESS_TOKEN="YOUR_USER_ACCESS_TOKEN_FROM_LOGIN"
-
-curl -i -X POST https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/progress \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{ "surah_id": 1, "duration_seconds": 300 }'
-
-Replace <YOUR_PROJECT_REF>.
-*/

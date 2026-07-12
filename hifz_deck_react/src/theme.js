@@ -1,7 +1,7 @@
 import { extendTheme } from '@chakra-ui/react'
 
 /**
- * Visual system for Hifz Deck:
+ * Visual system for Hifzer:
  * cool stone mist + deep teal ink + muted gold (ties to السابقون Elite).
  * Avoids purple gradients and flat gray dashboards.
  */
