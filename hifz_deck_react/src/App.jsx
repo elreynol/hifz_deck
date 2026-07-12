@@ -234,7 +234,41 @@ const displayNameForUser = (profileUsername, user) => {
 };
 
 /**
- * Collapse duplicate rows that used email as the key into the public username.
+ * All local names that belong to the same person (email, "elijah" from email,
+ * old usernames like "Elijah", metadata). Folded into publicUsername on merge.
+ */
+const identityAliasesForUser = (user, publicUsername) => {
+  const aliases = new Set();
+  if (publicUsername && !isHiddenLeaderboardUsername(publicUsername)) {
+    aliases.add(publicUsername);
+  }
+  const email = user?.email;
+  if (email) {
+    aliases.add(email);
+    const local = email.split('@')[0] || '';
+    if (local) {
+      aliases.add(local);
+      // elijah.reynolds → elijah, Elijah (common first-token usernames)
+      const first = local.split(/[._+-]/)[0];
+      if (first) {
+        aliases.add(first);
+        aliases.add(first.charAt(0).toUpperCase() + first.slice(1).toLowerCase());
+      }
+    }
+  }
+  const metaName = user?.user_metadata?.username;
+  if (metaName && !isHiddenLeaderboardUsername(metaName)) aliases.add(metaName);
+  return [...aliases];
+};
+
+const aliasMatch = (aliases, username) => {
+  if (!username) return false;
+  const lower = String(username).toLowerCase();
+  return [...aliases].some((a) => String(a).toLowerCase() === lower);
+};
+
+/**
+ * Collapse duplicate rows that used email / old usernames into the public username.
  * Keeps the higher count / faster time.
  */
 const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
@@ -254,7 +288,7 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
     let best = 0;
     const others = [];
     (list || []).forEach((entry) => {
-      if (entry?.username && aliases.has(entry.username)) {
+      if (entry?.username && aliasMatch(aliases, entry.username)) {
         best = Math.max(best, Number(entry.count) || 0);
       } else if (entry?.username && !isHiddenLeaderboardUsername(entry.username)) {
         others.push(entry);
@@ -266,7 +300,7 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
         others.push(entry);
       }
     });
-    if (best > 0 || (list || []).some((e) => e?.username && aliases.has(e.username))) {
+    if (best > 0 || (list || []).some((e) => e?.username && aliasMatch(aliases, e.username))) {
       others.push({ username: publicUsername, count: best });
     }
     return others.sort((a, b) => b.count - a.count);
@@ -278,7 +312,7 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
       let bestForUser = null;
       const others = [];
       bucket.forEach((entry) => {
-        if (entry?.username && aliases.has(entry.username)) {
+        if (entry?.username && aliasMatch(aliases, entry.username)) {
           if (!bestForUser || entry.time < bestForUser.time) {
             bestForUser = { username: publicUsername, time: entry.time };
           }
@@ -289,7 +323,7 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
       if (bestForUser) others.push(bestForUser);
       return others.sort((a, b) => a.time - b.time);
     }
-    if (isHiddenLeaderboardUsername(bucket.username) || aliases.has(bucket.username)) {
+    if (isHiddenLeaderboardUsername(bucket.username) || aliasMatch(aliases, bucket.username)) {
       return { username: publicUsername, time: bucket.time };
     }
     if (isHiddenLeaderboardUsername(bucket.username)) return null;
@@ -311,13 +345,13 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
     let best = 0;
     const others = [];
     (list || []).forEach((entry) => {
-      if (entry?.username && aliases.has(entry.username)) {
+      if (entry?.username && aliasMatch(aliases, entry.username)) {
         best = Math.max(best, Number(entry.points) || 0);
       } else if (entry?.username && !isHiddenLeaderboardUsername(entry.username)) {
         others.push(entry);
       }
     });
-    if (best > 0 || (list || []).some((e) => e?.username && aliases.has(e.username))) {
+    if (best > 0 || (list || []).some((e) => e?.username && aliasMatch(aliases, e.username))) {
       others.push({ username: publicUsername, points: best });
     }
     return others.sort((a, b) => b.points - a.points);
@@ -653,7 +687,7 @@ const App = () => {
         setLeaderboardData((prev) => {
           const cleaned = consolidateLeaderboardIdentity(
             prev,
-            [user.email],
+            identityAliasesForUser(user, name),
             name
           );
           localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(cleaned));
@@ -1414,7 +1448,7 @@ const App = () => {
         const merged = mergeLeaderboards(
           leaderboardData,
           data,
-          user?.email ? [user.email] : [],
+          identityAliasesForUser(user, boardName),
           boardName
         );
         setLeaderboardData(merged);
@@ -1578,7 +1612,7 @@ const App = () => {
         const merged = mergeLeaderboards(
           prev,
           data,
-          user?.email ? [user.email] : [],
+          identityAliasesForUser(user, displayNameForUser(profileUsername, user)),
           displayNameForUser(profileUsername, user)
         );
         localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(merged));
@@ -2236,7 +2270,11 @@ const App = () => {
           setUsernameDraft(name);
           setNeedsUsernameSetup(false);
           setLeaderboardData((prev) => {
-            const cleaned = consolidateLeaderboardIdentity(prev, [user?.email], name);
+            const cleaned = consolidateLeaderboardIdentity(
+              prev,
+              identityAliasesForUser(user, name),
+              name
+            );
             localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(cleaned));
             return cleaned;
           });
