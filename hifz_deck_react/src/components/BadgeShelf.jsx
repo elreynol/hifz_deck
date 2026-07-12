@@ -2,7 +2,8 @@ import React from 'react';
 import { Box, Flex, HStack, Text, Progress, useColorMode } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
 import BadgeIcon from './BadgeIcon';
-import { BADGE_CATALOG, JUZ_AMMA_SURAH_COUNT } from '../badges/badgeCatalog';
+import { BADGE_CATALOG } from '../badges/badgeCatalog';
+import { TOTAL_SURAHS, TOTAL_JUZS } from '../quran/quranHelpers';
 
 const shelfIn = keyframes`
   from { opacity: 0; transform: translateY(6px); }
@@ -10,18 +11,26 @@ const shelfIn = keyframes`
 `;
 
 /**
- * Horizontal badge shelf + streak + Juz Amma progress meter.
+ * Badge shelf: surah completion is the pride metric; juz' progress is a quiet pacing meter.
  */
 const BadgeShelf = ({
   earnedIds = [],
   newlyEarnedIds = [],
   currentStreak = 0,
-  uniqueForwardSurahs = 0,
+  completedSurahs = 0,
+  completedJuzs = 0,
+  selectedJuz = 30,
+  juzSectionsDone = 0,
+  juzSectionsTotal = 0,
 }) => {
   const { colorMode } = useColorMode();
   const earnedSet = new Set(earnedIds);
   const newSet = new Set(newlyEarnedIds);
-  const juzProgress = Math.min(100, (uniqueForwardSurahs / JUZ_AMMA_SURAH_COUNT) * 100);
+  const surahProgress = Math.min(100, (completedSurahs / TOTAL_SURAHS) * 100);
+  const juzPercent =
+    juzSectionsTotal > 0
+      ? Math.min(100, (juzSectionsDone / juzSectionsTotal) * 100)
+      : 0;
   const isDark = colorMode === 'dark';
 
   return (
@@ -51,19 +60,44 @@ const BadgeShelf = ({
               {currentStreak}-day streak
             </Text>
           )}
-          <Text fontSize="xs" color={isDark ? 'whiteAlpha.600' : 'mist.500'}>
-            Surahs {uniqueForwardSurahs}/{JUZ_AMMA_SURAH_COUNT}
+          <Text fontSize="xs" color={isDark ? 'whiteAlpha.700' : 'mist.600'} fontWeight="600">
+            Surahs {completedSurahs}/{TOTAL_SURAHS}
+          </Text>
+          <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
+            Juz&apos; {completedJuzs}/{TOTAL_JUZS}
           </Text>
         </HStack>
       </Flex>
 
+      {/* Primary: full named surahs */}
       <Progress
-        value={juzProgress}
+        value={surahProgress}
         size="xs"
         borderRadius="full"
         colorScheme="teal"
-        mb={3}
+        mb={2}
         bg={isDark ? 'whiteAlpha.200' : 'mist.200'}
+        aria-label={`Surahs completed ${completedSurahs} of ${TOTAL_SURAHS}`}
+      />
+
+      {/* Secondary: sections inside the juz' you're browsing */}
+      <Flex justify="space-between" align="center" mb={1}>
+        <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
+          Juz&apos; {selectedJuz} sections
+        </Text>
+        <Text fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
+          {juzSectionsDone}/{juzSectionsTotal || '—'}
+        </Text>
+      </Flex>
+      <Progress
+        value={juzPercent}
+        size="xs"
+        borderRadius="full"
+        colorScheme="gray"
+        mb={3}
+        bg={isDark ? 'whiteAlpha.100' : 'mist.100'}
+        opacity={0.85}
+        aria-label={`Juz ${selectedJuz} sections ${juzSectionsDone} of ${juzSectionsTotal}`}
       />
 
       <HStack
@@ -89,7 +123,7 @@ const BadgeShelf = ({
 
       {earnedIds.length === 0 && (
         <Text mt={2} fontSize="xs" color={isDark ? 'whiteAlpha.500' : 'mist.500'}>
-          Play to earn your first badge
+          Finish a full surah to earn your first badge
         </Text>
       )}
     </Box>

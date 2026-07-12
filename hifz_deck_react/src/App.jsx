@@ -14,6 +14,7 @@ import AppBackground from './components/AppBackground';
 import LoginForm from './components/auth/LoginForm';
 import BadgeShelf from './components/BadgeShelf';
 import AccountSettings from './components/AccountSettings';
+import PointsWeightingExplainer from './components/PointsWeightingExplainer';
 import { useSequence } from './context/SequenceContext';
 import { useAuth } from './context/AuthContext';
 import { supabase } from './supabaseClient';
@@ -30,6 +31,11 @@ import {
   surahInHizb,
   snapToSurah,
   getVersesInJuz,
+  getCompletedBoardKeys,
+  countFullyCompletedSurahs,
+  countFullyCompletedJuzs,
+  getJuzSegmentProgress,
+  isJuzFullyComplete,
 } from './quran/quranHelpers';
 
 // السابقون unlock thresholds
@@ -185,6 +191,49 @@ const getBestSurahTimeEntry = (entry) => {
   }
   if (typeof entry === 'object' && typeof entry.time === 'number') return entry;
   return null;
+};
+
+/** Board keys look like "2" or "2@h1" — use the surah id only for display. */
+const parseSurahIdFromBoardKey = (boardKey) => String(boardKey || '').split('@')[0];
+
+const getSurahDisplayName = (boardKey, sequence = [], quran = null) => {
+  const surahId = parseSurahIdFromBoardKey(boardKey);
+  const fromSequence = sequence.find((s) => String(s.number) === surahId);
+  if (fromSequence?.name) return fromSequence.name;
+  const fromQuran = quran?.surahs?.[surahId];
+  return fromQuran?.name || fromQuran?.nameSimple || surahId;
+};
+
+/**
+ * Fastest Times rows: one best time per surah (hizb segments ignored for now).
+ * @returns {{ surahId: string, name: string, username: string, time: number }[]}
+ */
+const buildFastestTimesRows = (surahTimes, sequence = [], quran = null) => {
+  const bestBySurah = new Map();
+
+  for (const [boardKey, entry] of Object.entries(surahTimes || {})) {
+    const best = getBestSurahTimeEntry(entry);
+    if (
+      !best ||
+      typeof best.time !== 'number' ||
+      !best.username ||
+      looksLikeEmail(best.username)
+    ) {
+      continue;
+    }
+    const surahId = parseSurahIdFromBoardKey(boardKey);
+    const existing = bestBySurah.get(surahId);
+    if (!existing || best.time < existing.time) {
+      bestBySurah.set(surahId, {
+        surahId,
+        name: getSurahDisplayName(surahId, sequence, quran),
+        username: best.username,
+        time: best.time,
+      });
+    }
+  }
+
+  return Array.from(bestBySurah.values()).sort((a, b) => a.time - b.time);
 };
 
 /** Prefer higher counts and faster times when combining local + server boards */
@@ -596,22 +645,28 @@ const App = () => {
   const reverseUnlocked = !!user && forwardCount >= REVERSE_UNLOCK_COUNT;
   const isElite = !!user && reverseCount >= ELITE_UNLOCK_COUNT;
 
-  // Unique forward surahs this user has completed (for Juz Amma / progress)
+  // Pride = fully finished surahs (every section); juz' = pacing
+  const completedBoardKeys = user
+    ? getCompletedBoardKeys(leaderboardData.surahTimes, [
+        boardName,
+        profileUsername,
+        user.email,
+      ])
+    : new Set();
   const uniqueForwardSurahs = user
-    ? new Set(
-        Object.entries(leaderboardData.surahTimes || {})
-          .filter(([, entry]) => {
-            const best = getBestSurahTimeEntry(entry);
-            return (
-              best &&
-              (best.username === boardName ||
-                best.username === profileUsername ||
-                best.username === user.email)
-            );
-          })
-          .map(([key]) => String(key).split('@')[0])
-      ).size
+    ? countFullyCompletedSurahs(quran, completedBoardKeys)
     : 0;
+  const completedJuzCount = user
+    ? countFullyCompletedJuzs(quran, completedBoardKeys)
+    : 0;
+  const selectedJuzProgress = getJuzSegmentProgress(
+    quran,
+    selectedJuz,
+    completedBoardKeys
+  );
+  const juzAmmaComplete = user
+    ? isJuzFullyComplete(quran, 30, completedBoardKeys)
+    : false;
 
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -862,6 +917,8 @@ const App = () => {
     justUnlockedReverse,
     justUnlockedElite,
     uniqueForwardAfter,
+    completedJuzAfter,
+    juzAmmaCompleteAfter,
   }) => {
     const streakNext = advanceStreak(lastPlayDate, currentStreak);
     setCurrentStreak(streakNext.currentStreak);
@@ -882,9 +939,10 @@ const App = () => {
       forwardCount: forwardCountAfter ?? forwardCount,
       reverseCount: reverseCountAfter ?? reverseCount,
       uniqueForwardSurahs: uniqueForwardAfter ?? uniqueForwardSurahs,
+      completedJuzCount: completedJuzAfter ?? completedJuzCount,
+      juzAmmaComplete: juzAmmaCompleteAfter ?? juzAmmaComplete,
       difficulty,
       cardCount: visibleCardCount,
-      playDirection,
       durationSeconds: timeTaken,
       ayahCount: cards.length,
       pbBeatCountForSurah: nextPbBeats[String(surahNumber)] || 0,
@@ -939,6 +997,8 @@ const App = () => {
     let justUnlockedReverse = false;
     let forwardCountAfter = forwardCount;
     let uniqueForwardAfter = uniqueForwardSurahs;
+    let completedJuzAfter = completedJuzCount;
+    let juzAmmaCompleteAfter = juzAmmaComplete;
     const milestones = [5, 10, 20];
 
     setLeaderboardData(prevData => {
@@ -986,10 +1046,10 @@ const App = () => {
       newData.totalCorrectSurahs.sort((a, b) => b.count - a.count);
       forwardCountAfter = currentTotalCorrectCount;
 
-      uniqueForwardAfter = Object.entries(newData.surahTimes || {}).filter(([, entry]) => {
-        const best = getBestSurahTimeEntry(entry);
-        return best && best.username === usernameToRecord;
-      }).length;
+      const keysAfter = getCompletedBoardKeys(newData.surahTimes, [usernameToRecord]);
+      uniqueForwardAfter = countFullyCompletedSurahs(quran, keysAfter);
+      completedJuzAfter = countFullyCompletedJuzs(quran, keysAfter);
+      juzAmmaCompleteAfter = isJuzFullyComplete(quran, 30, keysAfter);
 
       addOverallPoints(newData, usernameToRecord, pointsEarned);
 
@@ -1017,6 +1077,8 @@ const App = () => {
       personalBestAchieved,
       forwardCountAfter,
       uniqueForwardAfter,
+      completedJuzAfter,
+      juzAmmaCompleteAfter,
       justUnlockedReverse,
       justUnlockedElite: false,
     });
@@ -1034,10 +1096,33 @@ const App = () => {
           position: 'top-right' 
         });
       }
+      if (uniqueForwardAfter > uniqueForwardSurahs) {
+        const surahIdOnly = String(surahNumber).split('@')[0];
+        const surahName =
+          sequence.find((s) => s.number.toString() === surahIdOnly)?.name || 'this surah';
+        toast({
+          title: 'Surah complete!',
+          description: `You finished every section of ${surahName}.`,
+          status: 'success',
+          duration: 4500,
+          isClosable: true,
+          position: 'top-right',
+        });
+      }
+      if (completedJuzAfter > completedJuzCount) {
+        toast({
+          title: "Juz' complete!",
+          description: `You cleared every section in a juz'. (${completedJuzAfter}/${30})`,
+          status: 'success',
+          duration: 4500,
+          isClosable: true,
+          position: 'top-right',
+        });
+      }
       if (newTotalCorrectMilestone && newTotalCorrectMilestone !== REVERSE_UNLOCK_COUNT) {
         toast({
           title: 'Achievement Unlocked!',
-          description: `Congratulations! You've correctly completed ${newTotalCorrectMilestone} Surahs!`,
+          description: `Congratulations! You've correctly completed ${newTotalCorrectMilestone} sections!`,
           status: 'success',
           duration: 5000,
           isClosable: true,
@@ -1593,7 +1678,11 @@ const App = () => {
                 earnedIds={earnedBadgeIds}
                 newlyEarnedIds={newlyEarnedBadgeIds}
                 currentStreak={currentStreak}
-                uniqueForwardSurahs={uniqueForwardSurahs}
+                completedSurahs={uniqueForwardSurahs}
+                completedJuzs={completedJuzCount}
+                selectedJuz={selectedJuz}
+                juzSectionsDone={selectedJuzProgress.completed}
+                juzSectionsTotal={selectedJuzProgress.total}
               />
             </Box>
           )}
@@ -1922,7 +2011,7 @@ const App = () => {
                     textAlign="center"
                   >
                     Showing {visibleCards.length} of {unplacedCards.length} remaining
-                    {difficulty === 'experienced' ? ' (+ other surahs)' : ''}
+                    {difficulty === 'experienced' ? ' (+ other ayahs in this juz\')' : ''}
                   </Text>
                 )}
                 <SimpleGrid
@@ -1965,7 +2054,11 @@ const App = () => {
         isElite={isElite}
         earnedBadgeIds={earnedBadgeIds}
         currentStreak={currentStreak}
-        uniqueForwardSurahs={uniqueForwardSurahs}
+        completedSurahs={uniqueForwardSurahs}
+        completedJuzs={completedJuzCount}
+        selectedJuz={selectedJuz}
+        juzSectionsDone={selectedJuzProgress.completed}
+        juzSectionsTotal={selectedJuzProgress.total}
       />
 
       <Modal isOpen={isAuthModalOpen} onClose={() => { onAuthModalClose(); setEmailInput(''); setPasswordInput(''); setUsernameInput(''); }} isCentered>
@@ -2090,27 +2183,27 @@ const App = () => {
                       </Tr>
                     </Thead>
                     <Tbody>
-                      {Object.entries(leaderboardData.surahTimes).length > 0 ? (
-                        Object.entries(leaderboardData.surahTimes)
-                          .map(([surah, entry]) => [surah, getBestSurahTimeEntry(entry)])
-                          .filter(
-                            ([, data]) =>
-                              data &&
-                              typeof data.time === 'number' &&
-                              data.username &&
-                              !looksLikeEmail(data.username)
-                          )
-                          .sort(([, a], [, b]) => a.time - b.time)
-                          .map(([surah, data], index) => (
-                            <Tr key={index}>
-                              <Td>{surah}</Td>
-                              <Td>{data.username || 'Anonymous'}</Td>
-                              <Td>{data.time}</Td>
+                      {(() => {
+                        const rows = buildFastestTimesRows(
+                          leaderboardData.surahTimes,
+                          sequence,
+                          quran
+                        );
+                        if (rows.length === 0) {
+                          return (
+                            <Tr>
+                              <Td colSpan="3">No data available.</Td>
                             </Tr>
-                          ))
-                      ) : (
-                        <Tr><Td colSpan="3">No data available.</Td></Tr>
-                      )}
+                          );
+                        }
+                        return rows.map((row) => (
+                          <Tr key={row.surahId}>
+                            <Td>{row.name}</Td>
+                            <Td>{row.username || 'Anonymous'}</Td>
+                            <Td>{row.time}</Td>
+                          </Tr>
+                        ));
+                      })()}
                     </Tbody>
                   </Table>
                 </TableContainer>
@@ -2151,6 +2244,12 @@ const App = () => {
                 </TabPanel>
               </TabPanels>
             </Tabs>
+            <PointsWeightingExplainer
+              difficulty={difficulty}
+              cardCount={visibleCardCount}
+              playDirection={playDirection}
+              stopwatchEnabled={stopwatchEnabled}
+            />
           </ModalBody>
           <ModalFooter>
             <Button colorScheme="blue" mr={3} onClick={handleSyncLeaderboard}>

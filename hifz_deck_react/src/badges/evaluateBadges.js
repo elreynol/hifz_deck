@@ -2,6 +2,7 @@ import { BADGE_CATALOG, JUZ_AMMA_SURAH_COUNT } from './badgeCatalog';
 
 /**
  * Decide which new badges unlock after a completion.
+ * Surah pride uses fully-finished surahs (all sections); juz' is a pacing milestone.
  * @returns {string[]} newly earned badge ids
  */
 export function evaluateNewBadges({
@@ -9,9 +10,10 @@ export function evaluateNewBadges({
   forwardCount = 0,
   reverseCount = 0,
   uniqueForwardSurahs = 0,
+  completedJuzCount = 0,
+  juzAmmaComplete = false,
   difficulty = 'beginner',
   cardCount = 5,
-  playDirection = 'forward',
   durationSeconds = 1,
   ayahCount = 1,
   pbBeatCountForSurah = 0,
@@ -29,8 +31,17 @@ export function evaluateNewBadges({
     }
   };
 
-  if (forwardCount >= 1 || uniqueForwardSurahs >= 1) tryEarn('first_surah');
-  if (uniqueForwardSurahs >= JUZ_AMMA_SURAH_COUNT) tryEarn('juz_amma');
+  // Pride: full named surah (every surah∩hizb section cleared)
+  if (uniqueForwardSurahs >= 1) tryEarn('first_surah');
+
+  // Pacing: any full juz'
+  if (completedJuzCount >= 1) tryEarn('first_juz');
+
+  // Juz Amma milestone (Juz' 30)
+  if (juzAmmaComplete || uniqueForwardSurahs >= JUZ_AMMA_SURAH_COUNT) {
+    tryEarn('juz_amma');
+  }
+
   if (pbBeatCountForSurah >= 3) tryEarn('persistent_pb');
   if (difficulty === 'experienced') tryEarn('experienced_initiate');
   if (cardCount === 5) tryEarn('five_card_ace');
@@ -50,7 +61,6 @@ export function evaluateNewBadges({
   if (justUnlockedReverse || forwardCount >= 10) tryEarn('sabiqoon');
   if (justUnlockedElite || reverseCount >= 3) tryEarn('elite');
 
-  // Only return ids that exist in the catalog
   const valid = new Set(BADGE_CATALOG.map((b) => b.id));
   return newly.filter((id) => valid.has(id));
 }

@@ -19,7 +19,11 @@ const AccountSettings = ({
   isElite = false,
   earnedBadgeIds = [],
   currentStreak = 0,
-  uniqueForwardSurahs = 0,
+  completedSurahs = 0,
+  completedJuzs = 0,
+  selectedJuz = 30,
+  juzSectionsDone = 0,
+  juzSectionsTotal = 0,
 }) => {
   const { user, session, updateUsername, updateUserPassword } = useAuth();
   const toast = useToast();
@@ -230,7 +234,11 @@ const AccountSettings = ({
                   <BadgeShelf
                     earnedIds={earnedBadgeIds}
                     currentStreak={currentStreak}
-                    uniqueForwardSurahs={uniqueForwardSurahs}
+                    completedSurahs={completedSurahs}
+                    completedJuzs={completedJuzs}
+                    selectedJuz={selectedJuz}
+                    juzSectionsDone={juzSectionsDone}
+                    juzSectionsTotal={juzSectionsTotal}
                   />
                 </Box>
 
