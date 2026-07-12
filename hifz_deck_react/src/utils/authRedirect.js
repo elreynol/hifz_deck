@@ -1,6 +1,8 @@
-/** App is served under Vite/GitHub Pages basename `/hifz_deck`. */
-
-export const APP_BASENAME = '/hifz_deck';
+/**
+ * App is served at the site root on the custom domain (hifzer.app).
+ * Empty basename = paths like / and /update-password (not /hifz_deck/...).
+ */
+export const APP_BASENAME = '';
 
 /**
  * Absolute URL inside the SPA (respects basename on GitHub Pages + local Vite).

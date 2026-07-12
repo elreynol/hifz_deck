@@ -15,7 +15,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <ColorModeScript initialColorMode={theme.config.initialColorMode} />
       <AuthProvider>
         <SequenceProvider>
-          <Router basename="/hifz_deck">
+          <Router basename="/">
             <Routes>
               <Route path="/" element={<App />} />
               <Route path="/profile" element={<UserProfile />} />

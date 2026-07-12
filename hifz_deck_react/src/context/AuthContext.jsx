@@ -168,7 +168,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  /** Redirects the browser to Google → Supabase → back to /hifz_deck/ */
+  /** Redirects the browser to Google → Supabase → back to the app home URL */
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
