@@ -7,6 +7,7 @@ import {
   Text,
   Button,
   Avatar,
+  Badge,
   HStack,
   VStack,
   Spinner,
@@ -17,9 +18,10 @@ import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { keyframes } from '@emotion/react';
 import AppBackground from './AppBackground';
 import BadgeShelf from './BadgeShelf';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, isGuestUser } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { loadPublicProfile } from '../utils/loadPublicProfile';
+import { loadGuestProfileFromLocal } from '../utils/loadGuestProfileFromLocal';
 import { isLinkableUsername } from './LeaderboardUsernameLink';
 
 const fadeUp = keyframes`
@@ -58,7 +60,7 @@ const UserProfile = () => {
   const borderSoft = isDark ? 'whiteAlpha.200' : 'mist.200';
   const panelBg = isDark ? 'rgba(34, 66, 63, 0.55)' : 'rgba(255, 255, 255, 0.72)';
 
-  // /profile with no username → resolve to the logged-in user's public name
+  // /profile with no username → resolve to the signed-in / guest name
   useEffect(() => {
     if (usernameParam) return;
 
@@ -66,6 +68,17 @@ const UserProfile = () => {
       if (authLoading) return;
       if (!user) {
         setStatus('need_login');
+        return;
+      }
+
+      // Guest: temporary name lives only in this browser
+      if (isGuestUser(user)) {
+        const guestName = user.user_metadata?.username;
+        if (!guestName) {
+          setStatus('need_login');
+          return;
+        }
+        navigate(`/profile/${encodeURIComponent(guestName)}`, { replace: true });
         return;
       }
 
@@ -93,7 +106,7 @@ const UserProfile = () => {
     resolveOwn();
   }, [usernameParam, user, authLoading, navigate]);
 
-  // Load the public profile when we have a username in the URL
+  // Load profile when we have a username in the URL
   useEffect(() => {
     if (!usernameParam) return;
 
@@ -101,17 +114,36 @@ const UserProfile = () => {
 
     const run = async () => {
       setStatus('loading');
+      const decoded = decodeURIComponent(usernameParam);
+      const guestName = isGuestUser(user) ? user.user_metadata?.username : null;
+
+      // Own guest profile → local data only
+      if (guestName && decoded === guestName) {
+        const local = loadGuestProfileFromLocal(guestName);
+        if (cancelled) return;
+        if (!local.ok) {
+          setPayload(null);
+          setStatus('not_found');
+          return;
+        }
+        setPayload(local);
+        setIsOwnProfile(true);
+        setStatus('ready');
+        return;
+      }
+
       const result = await loadPublicProfile(usernameParam);
       if (cancelled) return;
 
       if (!result.ok) {
+        // Another browser's Guest_XXX won't exist on the server
         setPayload(null);
         setStatus(result.reason === 'not_found' || result.reason === 'missing' ? 'not_found' : 'error');
         return;
       }
 
       setPayload(result);
-      setIsOwnProfile(Boolean(user && user.id === result.profile.id));
+      setIsOwnProfile(Boolean(user && !isGuestUser(user) && user.id === result.profile.id));
       setStatus('ready');
     };
 
@@ -157,7 +189,7 @@ const UserProfile = () => {
               Sign in to view your profile
             </Heading>
             <Text color={muted} mb={5}>
-              Your public profile shows badges, ranking, and points once you have a username.
+              Sign in, create an account, or continue as a guest from the home page to see your profile.
             </Text>
             <Button as={RouterLink} to="/" bg="ink.600" color="white" _hover={{ bg: 'ink.700' }}>
               Go to Hifzer
@@ -236,11 +268,20 @@ const UserProfile = () => {
                 {payload.profile.username}
               </Heading>
               <Text fontSize="sm" color={muted}>
-                {isOwnProfile ? 'Your public Hifzer profile' : 'Hifzer player'}
+                {payload.isGuest
+                  ? 'Guest profile · saved on this device only'
+                  : isOwnProfile
+                    ? 'Your public Hifzer profile'
+                    : 'Hifzer player'}
                 {payload.profile.current_streak > 0
                   ? ` · ${payload.profile.current_streak}-day streak`
                   : ''}
               </Text>
+              {payload.isGuest && (
+                <Badge mt={3} colorScheme="orange">
+                  Guest
+                </Badge>
+              )}
             </Box>
 
             {/* Rank + points */}
@@ -282,8 +323,10 @@ const UserProfile = () => {
 
             {isOwnProfile && (
               <HStack justify="center" pt={1}>
-                <Text fontSize="xs" color={muted}>
-                  Tip: friends can open this page from your name on the leaderboard.
+                <Text fontSize="xs" color={muted} textAlign="center">
+                  {payload.isGuest
+                    ? 'Create an account to keep your progress after you leave this browser.'
+                    : 'Tip: friends can open this page from your name on the leaderboard.'}
                 </Text>
               </HStack>
             )}

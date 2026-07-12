@@ -21,7 +21,7 @@ import AccountSettings from './components/AccountSettings';
 import PointsWeightingExplainer from './components/PointsWeightingExplainer';
 import LeaderboardUsernameLink from './components/LeaderboardUsernameLink';
 import { useSequence } from './context/SequenceContext';
-import { useAuth } from './context/AuthContext';
+import { useAuth, isGuestUser } from './context/AuthContext';
 import { supabase } from './supabaseClient';
 import { Link as RouterLink } from 'react-router-dom';
 import { computePoints } from './utils/scoring';
@@ -523,7 +523,9 @@ const App = () => {
   const { 
     user, 
     session, 
-    logout, 
+    logout,
+    signInAsGuest,
+    isGuest,
     signUp,
     initialLoading: authInitialLoading, 
     loading: authLoading 
@@ -644,8 +646,17 @@ const App = () => {
       return;
     }
 
-    // Close login modal after OAuth / email session is live
+    // Close login modal after OAuth / email / guest session is live
     if (isAuthModalOpen) onAuthModalClose();
+
+    // Guest: temporary name only — no Supabase profile
+    if (isGuestUser(user)) {
+      const guestName = user.user_metadata?.username || 'Guest';
+      setProfileUsername(guestName);
+      setUsernameDraft(guestName);
+      setNeedsUsernameSetup(false);
+      return;
+    }
 
     let cancelled = false;
     (async () => {
@@ -1468,6 +1479,9 @@ const App = () => {
 
   /** Send a completion to the server so shared leaderboards can fill in */
   const recordProgressOnServer = async (surahNumber, timeTaken, _pointsEarned = 0, extras = {}) => {
+    // Guests stay local-only — never call the progress Edge Function
+    if (isGuestUser(user)) return;
+
     const surahIdNum = parseInt(surahNumber, 10);
     const durationNum = Math.max(1, Math.round(Number(timeTaken) || 0));
     if (isNaN(surahIdNum) || surahIdNum <= 0) return;
@@ -1520,10 +1534,68 @@ const App = () => {
     }
   };
 
-  const handleModalLogin = async () => {
-    if (emailInput.trim() === '' || passwordInput.trim() === '') {
-      toast({ title: 'Login Failed', description: 'Email and password are required.', status: 'error', duration: 3000, isClosable: true });
+  const handleGuestContinue = () => {
+    const { error } = signInAsGuest();
+    if (error) {
+      toast({
+        title: 'Could not start guest play',
+        description: error.message || 'Please try again.',
+        status: 'error',
+        duration: 4000,
+        isClosable: true,
+      });
       return;
+    }
+    onAuthModalClose();
+    toast({
+      title: 'Playing as guest',
+      description: 'Scores and badges stay on this device only — create an account to save them.',
+      status: 'info',
+      duration: 4500,
+      isClosable: true,
+    });
+  };
+
+  /** End session; for guests, drop their temporary name from the local board */
+  const handleLogout = async () => {
+    const guestName = isGuestUser(user) ? user.user_metadata?.username : null;
+    await logout();
+    if (guestName) {
+      setLeaderboardData((prev) => {
+        const cleaned = scrubHiddenLeaderboardUsernames(
+          {
+            ...prev,
+            totalCorrectSurahs: (prev.totalCorrectSurahs || []).filter((e) => e.username !== guestName),
+            reverseCompletedSurahs: (prev.reverseCompletedSurahs || []).filter((e) => e.username !== guestName),
+            overallPoints: (prev.overallPoints || []).filter((e) => e.username !== guestName),
+            surahTimes: Object.fromEntries(
+              Object.entries(prev.surahTimes || {}).map(([k, bucket]) => {
+                if (Array.isArray(bucket)) {
+                  return [k, bucket.filter((e) => e.username !== guestName)];
+                }
+                if (bucket?.username === guestName) return [k, null];
+                return [k, bucket];
+              }).filter(([, v]) => v && !(Array.isArray(v) && v.length === 0))
+            ),
+            reverseSurahTimes: Object.fromEntries(
+              Object.entries(prev.reverseSurahTimes || {}).map(([k, bucket]) => {
+                if (Array.isArray(bucket)) {
+                  return [k, bucket.filter((e) => e.username !== guestName)];
+                }
+                if (bucket?.username === guestName) return [k, null];
+                return [k, bucket];
+              }).filter(([, v]) => v && !(Array.isArray(v) && v.length === 0))
+            ),
+          }
+        );
+        localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(cleaned));
+        return cleaned;
+      });
+      setEarnedBadgeIds([]);
+      localStorage.removeItem(BADGES_STORAGE_KEY);
+      setCurrentStreak(0);
+      setLastPlayDate(null);
+      localStorage.removeItem(STREAK_STORAGE_KEY);
     }
   };
 
@@ -1765,11 +1837,13 @@ const App = () => {
                   <Button as={RouterLink} to="/profile" size="xs" variant="ghost" colorScheme="teal">
                     Profile
                   </Button>
-                  <Button onClick={onAccountSettingsOpen} size="xs" variant="ghost" colorScheme="teal">
-                    Account
-                  </Button>
-                  <Button onClick={logout} size="xs" variant="outline" colorScheme="teal" isLoading={authLoading}>
-                    Logout
+                  {!isGuest && (
+                    <Button onClick={onAccountSettingsOpen} size="xs" variant="ghost" colorScheme="teal">
+                      Account
+                    </Button>
+                  )}
+                  <Button onClick={handleLogout} size="xs" variant="outline" colorScheme="teal" isLoading={authLoading}>
+                    {isGuest ? 'End guest' : 'Logout'}
                   </Button>
                   <IconButton
                     icon={<StarIcon />}
@@ -1786,16 +1860,23 @@ const App = () => {
               {user ? (
                 <>
                   <Text fontSize="sm" noOfLines={1} maxW="160px" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
-                    {user.email}
+                    {isGuest ? boardName : (user.email || boardName)}
                   </Text>
+                  {isGuest && (
+                    <Badge colorScheme="orange" fontSize="0.65rem">
+                      Guest
+                    </Badge>
+                  )}
                   <Button as={RouterLink} to="/profile" size="sm" variant="ghost" colorScheme="teal">
                     Profile
                   </Button>
-                  <Button onClick={onAccountSettingsOpen} size="sm" variant="ghost" colorScheme="teal">
-                    Account
-                  </Button>
-                  <Button onClick={logout} size="sm" variant="outline" colorScheme="teal" isLoading={authLoading}>
-                    Logout
+                  {!isGuest && (
+                    <Button onClick={onAccountSettingsOpen} size="sm" variant="ghost" colorScheme="teal">
+                      Account
+                    </Button>
+                  )}
+                  <Button onClick={handleLogout} size="sm" variant="outline" colorScheme="teal" isLoading={authLoading}>
+                    {isGuest ? 'End guest' : 'Logout'}
                   </Button>
                   <IconButton
                     icon={<StarIcon />}
@@ -2375,6 +2456,18 @@ const App = () => {
                 Sign up
               </Button>
             )}
+            <Button
+              variant="outline"
+              borderColor={colorMode === 'dark' ? 'whiteAlpha.400' : 'mist.300'}
+              onClick={handleGuestContinue}
+              isLoading={authLoading}
+              h="44px"
+            >
+              Continue as guest
+            </Button>
+            <Text fontSize="xs" color={colorMode === 'dark' ? 'whiteAlpha.500' : 'mist.500'} textAlign="center">
+              Guest progress stays on this device only
+            </Text>
             <Button
               onClick={() => {
                 setIsSigningUp(!isSigningUp);
