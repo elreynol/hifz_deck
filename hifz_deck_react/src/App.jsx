@@ -12,25 +12,33 @@ import Card from './components/Card';
 import SequenceArea from './components/SequenceArea';
 import AppBackground from './components/AppBackground';
 import LoginForm from './components/auth/LoginForm';
+import BadgeShelf from './components/BadgeShelf';
+import AccountSettings from './components/AccountSettings';
 import { useSequence } from './context/SequenceContext';
 import { useAuth } from './context/AuthContext';
 import { supabase } from './supabaseClient';
-import AccountSettings from './components/AccountSettings';
+import { computePoints } from './utils/scoring';
+import { buildChoicePool, shuffleArray } from './utils/buildChoicePool';
+import { BADGE_BY_ID } from './badges/badgeCatalog';
+import { evaluateNewBadges, advanceStreak } from './badges/evaluateBadges';
 
-// Max cards shown in the tap pool at once (keeps long surahs manageable)
-const MAX_VISIBLE_CARDS = 5;
 // السابقون unlock thresholds
 const REVERSE_UNLOCK_COUNT = 10; // forward completions to unlock reverse
 const ELITE_UNLOCK_COUNT = 3;    // reverse completions for Elite status
+
+const BADGES_STORAGE_KEY = 'hifzDeckBadges';
+const STREAK_STORAGE_KEY = 'hifzDeckStreak';
+const PB_BEATS_STORAGE_KEY = 'hifzDeckPbBeats';
 
 const EMPTY_LEADERBOARDS = {
   surahTimes: {},
   totalCorrectSurahs: [],
   reverseSurahTimes: {},
   reverseCompletedSurahs: [],
+  overallPoints: [],
 };
 
-/** Ensure leaderboard object always has reverse fields */
+/** Ensure leaderboard object always has reverse + points fields */
 const normalizeLeaderboards = (data) => ({
   ...EMPTY_LEADERBOARDS,
   ...(data && typeof data === 'object' && !Array.isArray(data) ? data : {}),
@@ -38,6 +46,7 @@ const normalizeLeaderboards = (data) => ({
   totalCorrectSurahs: Array.isArray(data?.totalCorrectSurahs) ? data.totalCorrectSurahs : [],
   reverseSurahTimes: data?.reverseSurahTimes || {},
   reverseCompletedSurahs: Array.isArray(data?.reverseCompletedSurahs) ? data.reverseCompletedSurahs : [],
+  overallPoints: Array.isArray(data?.overallPoints) ? data.overallPoints : [],
 });
 
 const getUserCount = (list, ...aliases) => {
@@ -131,10 +140,27 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
     return out;
   };
 
+  const mergePointsList = (list) => {
+    let best = 0;
+    const others = [];
+    (list || []).forEach((entry) => {
+      if (entry?.username && aliases.has(entry.username)) {
+        best = Math.max(best, Number(entry.points) || 0);
+      } else if (entry?.username && !looksLikeEmail(entry.username)) {
+        others.push(entry);
+      }
+    });
+    if (best > 0 || (list || []).some((e) => e?.username && aliases.has(e.username))) {
+      others.push({ username: publicUsername, points: best });
+    }
+    return others.sort((a, b) => b.points - a.points);
+  };
+
   return {
     ...normalized,
     totalCorrectSurahs: mergeCountList(normalized.totalCorrectSurahs),
     reverseCompletedSurahs: mergeCountList(normalized.reverseCompletedSurahs),
+    overallPoints: mergePointsList(normalized.overallPoints),
     surahTimes: remapTimes(normalized.surahTimes),
     reverseSurahTimes: remapTimes(normalized.reverseSurahTimes),
   };
@@ -210,6 +236,19 @@ const mergeLeaderboards = (localData, serverData, emailAliases = [], publicUsern
     return out;
   };
 
+  const mergePointsLists = (a, b) => {
+    const map = new Map();
+    [...(a || []), ...(b || [])].forEach((entry) => {
+      if (!entry?.username || looksLikeEmail(entry.username)) return;
+      const prev = map.get(entry.username);
+      const points = Number(entry.points) || 0;
+      if (!prev || points > prev.points) {
+        map.set(entry.username, { username: entry.username, points });
+      }
+    });
+    return Array.from(map.values()).sort((x, y) => y.points - x.points);
+  };
+
   merged.totalCorrectSurahs = mergeCountLists(
     local.totalCorrectSurahs,
     server.totalCorrectSurahs
@@ -218,6 +257,7 @@ const mergeLeaderboards = (localData, serverData, emailAliases = [], publicUsern
     local.reverseCompletedSurahs,
     server.reverseCompletedSurahs
   );
+  merged.overallPoints = mergePointsLists(local.overallPoints, server.overallPoints);
   merged.surahTimes = mergeSurahTimes(local.surahTimes, server.surahTimes);
   merged.reverseSurahTimes = mergeSurahTimes(
     local.reverseSurahTimes,
@@ -261,14 +301,24 @@ const App = () => {
   const [attemptMode, setAttemptMode] = useState('three');
   // playDirection: 'forward' (1→n) or 'reverse' السابقون (n→1)
   const [playDirection, setPlayDirection] = useState('forward');
+  // Difficulty + how many choice cards to show
+  const [difficulty, setDifficulty] = useState('beginner');
+  const [visibleCardCount, setVisibleCardCount] = useState(5);
   const [nextExpectedVerse, setNextExpectedVerse] = useState(1);
   const [failCount, setFailCount] = useState(0);
   // Brief visual feedback on the tapped card
   const [feedbackCardId, setFeedbackCardId] = useState(null);
   const [feedbackStatus, setFeedbackStatus] = useState('idle'); // 'idle' | 'correct' | 'incorrect'
   const feedbackTimeoutRef = useRef(null);
-  // IDs of cards currently shown in the pool (max MAX_VISIBLE_CARDS)
-  const [visiblePoolIds, setVisiblePoolIds] = useState([]);
+  // Visible choice pool (may include foreign distractors on Experienced)
+  const [choiceCards, setChoiceCards] = useState([]);
+
+  // Badges / streak / personal-best beat counts
+  const [earnedBadgeIds, setEarnedBadgeIds] = useState([]);
+  const [newlyEarnedBadgeIds, setNewlyEarnedBadgeIds] = useState([]);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [lastPlayDate, setLastPlayDate] = useState(null);
+  const [pbBeatCounts, setPbBeatCounts] = useState({});
 
   // Auth state
   const { isOpen: isAuthModalOpen, onOpen: onAuthModalOpen, onClose: onAuthModalClose } = useDisclosure();
@@ -309,6 +359,26 @@ const App = () => {
     } else {
       localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(EMPTY_LEADERBOARDS));
     }
+
+    try {
+      const badges = JSON.parse(localStorage.getItem(BADGES_STORAGE_KEY) || '[]');
+      if (Array.isArray(badges)) setEarnedBadgeIds(badges);
+    } catch {
+      setEarnedBadgeIds([]);
+    }
+    try {
+      const streak = JSON.parse(localStorage.getItem(STREAK_STORAGE_KEY) || '{}');
+      setCurrentStreak(Number(streak.currentStreak) || 0);
+      setLastPlayDate(streak.lastPlayDate || null);
+    } catch {
+      /* ignore */
+    }
+    try {
+      const beats = JSON.parse(localStorage.getItem(PB_BEATS_STORAGE_KEY) || '{}');
+      if (beats && typeof beats === 'object') setPbBeatCounts(beats);
+    } catch {
+      setPbBeatCounts({});
+    }
   }, []);
 
   // Load profile username and rewrite any email-keyed local scores
@@ -323,12 +393,32 @@ const App = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, last_play_date, current_streak')
           .eq('id', user.id)
           .maybeSingle();
         if (cancelled) return;
         const name = displayNameForUser(data?.username, user);
         setProfileUsername(name);
+
+        if (data?.current_streak != null) {
+          setCurrentStreak(Number(data.current_streak) || 0);
+        }
+        if (data?.last_play_date) {
+          setLastPlayDate(data.last_play_date);
+        }
+
+        const { data: badgeRows } = await supabase
+          .from('user_badges')
+          .select('badge_id')
+          .eq('user_id', user.id);
+        if (!cancelled && Array.isArray(badgeRows)) {
+          const ids = badgeRows.map((r) => r.badge_id).filter(Boolean);
+          setEarnedBadgeIds((prev) => {
+            const merged = Array.from(new Set([...prev, ...ids]));
+            localStorage.setItem(BADGES_STORAGE_KEY, JSON.stringify(merged));
+            return merged;
+          });
+        }
 
         setLeaderboardData((prev) => {
           const cleaned = consolidateLeaderboardIdentity(
@@ -451,40 +541,34 @@ const App = () => {
   const reverseUnlocked = !!user && forwardCount >= REVERSE_UNLOCK_COUNT;
   const isElite = !!user && reverseCount >= ELITE_UNLOCK_COUNT;
 
+  // Unique forward surahs this user has a time for (Juz Amma progress)
+  const uniqueForwardSurahs = user
+    ? Object.entries(leaderboardData.surahTimes || {}).filter(([, entry]) => {
+        const best = getBestSurahTimeEntry(entry);
+        return (
+          best &&
+          (best.username === boardName ||
+            best.username === profileUsername ||
+            best.username === user.email)
+        );
+      }).length
+    : 0;
+
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const shuffleArray = (array) => {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
-  };
-
-  /**
-   * Build a visible pool of up to MAX_VISIBLE_CARDS.
-   * Always includes the next expected ayah so the game stays solvable,
-   * then fills with random distractors from remaining unplaced cards.
-   */
-  const buildVisiblePoolIds = (allCards, expectedVerse) => {
-    const unplaced = allCards.filter((c) => c.position === null);
-    if (unplaced.length === 0) return [];
-
-    const correct = unplaced.find((c) => c.verse === expectedVerse);
-    const distractors = shuffleArray(unplaced.filter((c) => c.verse !== expectedVerse));
-    const slotsForDistractors = Math.max(0, MAX_VISIBLE_CARDS - (correct ? 1 : 0));
-    const selected = correct
-      ? [correct, ...distractors.slice(0, slotsForDistractors)]
-      : distractors.slice(0, MAX_VISIBLE_CARDS);
-
-    // Shuffle so the correct ayah is not always in the same spot
-    return shuffleArray(selected).map((c) => c.id);
-  };
+  const refillChoices = (allCards, expectedVerse) =>
+    buildChoicePool({
+      allCards,
+      expectedVerse,
+      visibleCardCount,
+      difficulty,
+      sequence,
+      selectedSurah,
+    });
 
   // Flash correct/incorrect feedback on a card, then clear it
   const flashFeedback = (cardId, status, durationMs = 500) => {
@@ -516,7 +600,7 @@ const App = () => {
     );
     const startVerse = getStartVerse(resetCards.length);
     setCards(resetCards);
-    setVisiblePoolIds(buildVisiblePoolIds(resetCards, startVerse));
+    setChoiceCards(refillChoices(resetCards, startVerse));
     setNextExpectedVerse(startVerse);
     setFailCount(0);
     setFeedbackCardId(null);
@@ -538,33 +622,44 @@ const App = () => {
     });
   };
 
-  // User taps a card in the pool — check if it is the next expected ayah
-  const handleCardTap = (cardId) => {
+  // User taps a choice in the pool — check if it is the next expected ayah
+  const handleCardTap = (choiceId) => {
     if (!gameStarted) return;
 
-    const card = cards.find((c) => c.id === cardId);
-    // Ignore taps on already-completed cards or missing cards
-    if (!card || card.position !== null) return;
+    const choice = choiceCards.find((c) => c.id === choiceId);
+    if (!choice) return;
 
-    if (card.verse === nextExpectedVerse) {
-      // Correct tap: lock card into completed sequence
+    const isCorrect =
+      !choice.isForeign &&
+      choice.verse === nextExpectedVerse &&
+      choice.sourceCardId != null;
+
+    if (isCorrect) {
+      const cardId = choice.sourceCardId;
       const updatedCards = cards.map((c) =>
         c.id === cardId ? { ...c, position: c.verse } : c
       );
       setCards(updatedCards);
       setFailCount(0);
-      flashFeedback(cardId, 'correct', 400);
+      flashFeedback(choiceId, 'correct', 400);
 
       const allDone = updatedCards.every((c) => c.position !== null);
       if (allDone) {
-        setVisiblePoolIds([]);
+        setChoiceCards([]);
         setTimerActive(false);
-        // Capture seconds now; timer may still be 0 on a very fast clear
         const elapsedSeconds = Math.max(1, time);
         const recordedTime = formatTime(elapsedSeconds);
+        const pointsEarned = computePoints({
+          ayahCount: updatedCards.length,
+          durationSeconds: elapsedSeconds,
+          cardCount: visibleCardCount,
+          difficulty,
+          playDirection,
+          stopwatchEnabled,
+        });
         toast({
           title: playDirection === 'reverse' ? 'السابقون — Correct!' : 'Correct!',
-          description: `Well done! Your time: ${recordedTime}`,
+          description: `Well done! Your time: ${recordedTime} · +${pointsEarned} pts`,
           status: 'success',
           duration: 5000,
           isClosable: true,
@@ -572,21 +667,19 @@ const App = () => {
         });
         if (user && selectedSurah) {
           if (playDirection === 'reverse') {
-            updateReverseLeaderboards(selectedSurah, elapsedSeconds);
+            updateReverseLeaderboards(selectedSurah, elapsedSeconds, pointsEarned);
           } else {
-            updateLeaderboards(selectedSurah, elapsedSeconds);
+            updateLeaderboards(selectedSurah, elapsedSeconds, pointsEarned);
           }
         }
       } else {
-        // Advance and refill the pool with the new expected ayah + fresh distractors
         const newExpected = getAdvancedVerse(nextExpectedVerse);
         setNextExpectedVerse(newExpected);
-        setVisiblePoolIds(buildVisiblePoolIds(updatedCards, newExpected));
+        setChoiceCards(refillChoices(updatedCards, newExpected));
       }
     } else {
-      // Incorrect tap — pool stays the same
       const newFailCount = failCount + 1;
-      flashFeedback(cardId, 'incorrect', 500);
+      flashFeedback(choiceId, 'incorrect', 500);
 
       if (attemptMode === 'three' && newFailCount >= 3) {
         handleStrikeReset();
@@ -620,7 +713,16 @@ const App = () => {
     );
     const startVerse = direction === 'reverse' ? startedCards.length : 1;
     setCards(startedCards);
-    setVisiblePoolIds(buildVisiblePoolIds(startedCards, startVerse));
+    setChoiceCards(
+      buildChoicePool({
+        allCards: startedCards,
+        expectedVerse: startVerse,
+        visibleCardCount,
+        difficulty,
+        sequence,
+        selectedSurah,
+      })
+    );
     setGameStarted(true);
     setNextExpectedVerse(startVerse);
     setFailCount(0);
@@ -638,7 +740,7 @@ const App = () => {
       toast({ title: 'Start the game first!', status: 'info', duration: 2000, isClosable: true });
       return;
     }
-    setVisiblePoolIds(buildVisiblePoolIds(cards, nextExpectedVerse));
+    setChoiceCards(refillChoices(cards, nextExpectedVerse));
   };
 
   const handleReset = () => {
@@ -662,18 +764,98 @@ const App = () => {
     setFailCount(0);
     setFeedbackCardId(null);
     setFeedbackStatus('idle');
-    setVisiblePoolIds([]);
+    setChoiceCards([]);
     if (timerRef.current) clearInterval(timerRef.current);
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
   };
 
-  const updateLeaderboards = (surahNumber, timeTaken) => {
+  const applyGamificationRewards = ({
+    surahNumber,
+    timeTaken,
+    pointsEarned,
+    personalBestAchieved,
+    forwardCountAfter,
+    reverseCountAfter,
+    justUnlockedReverse,
+    justUnlockedElite,
+    uniqueForwardAfter,
+  }) => {
+    const streakNext = advanceStreak(lastPlayDate, currentStreak);
+    setCurrentStreak(streakNext.currentStreak);
+    setLastPlayDate(streakNext.lastPlayDate);
+    localStorage.setItem(STREAK_STORAGE_KEY, JSON.stringify(streakNext));
+
+    let nextPbBeats = pbBeatCounts;
+    if (personalBestAchieved) {
+      const key = String(surahNumber);
+      const beats = (pbBeatCounts[key] || 0) + 1;
+      nextPbBeats = { ...pbBeatCounts, [key]: beats };
+      setPbBeatCounts(nextPbBeats);
+      localStorage.setItem(PB_BEATS_STORAGE_KEY, JSON.stringify(nextPbBeats));
+    }
+
+    const newBadges = evaluateNewBadges({
+      earnedIds: earnedBadgeIds,
+      forwardCount: forwardCountAfter ?? forwardCount,
+      reverseCount: reverseCountAfter ?? reverseCount,
+      uniqueForwardSurahs: uniqueForwardAfter ?? uniqueForwardSurahs,
+      difficulty,
+      cardCount: visibleCardCount,
+      playDirection,
+      durationSeconds: timeTaken,
+      ayahCount: cards.length,
+      pbBeatCountForSurah: nextPbBeats[String(surahNumber)] || 0,
+      currentStreak: streakNext.currentStreak,
+      justUnlockedReverse,
+      justUnlockedElite,
+    });
+
+    if (newBadges.length > 0) {
+      const merged = Array.from(new Set([...earnedBadgeIds, ...newBadges]));
+      setEarnedBadgeIds(merged);
+      setNewlyEarnedBadgeIds(newBadges);
+      localStorage.setItem(BADGES_STORAGE_KEY, JSON.stringify(merged));
+      newBadges.forEach((id) => {
+        const badge = BADGE_BY_ID[id];
+        if (!badge) return;
+        toast({
+          title: 'Badge unlocked!',
+          description: badge.title,
+          status: 'success',
+          duration: 4000,
+          isClosable: true,
+          position: 'top-right',
+        });
+      });
+      setTimeout(() => setNewlyEarnedBadgeIds([]), 2500);
+    }
+
+    recordProgressOnServer(surahNumber, timeTaken, pointsEarned, {
+      badgeIds: newBadges,
+      streak: streakNext,
+    });
+  };
+
+  const addOverallPoints = (data, usernameToRecord, pointsEarned) => {
+    const idx = data.overallPoints.findIndex((e) => e.username === usernameToRecord);
+    if (idx > -1) {
+      data.overallPoints[idx].points =
+        (Number(data.overallPoints[idx].points) || 0) + pointsEarned;
+    } else {
+      data.overallPoints.push({ username: usernameToRecord, points: pointsEarned });
+    }
+    data.overallPoints.sort((a, b) => b.points - a.points);
+  };
+
+  const updateLeaderboards = (surahNumber, timeTaken, pointsEarned = 0) => {
     if (!user) return;
     const usernameToRecord = displayNameForUser(profileUsername, user);
 
     let personalBestAchieved = false;
     let newTotalCorrectMilestone = null;
     let justUnlockedReverse = false;
+    let forwardCountAfter = forwardCount;
+    let uniqueForwardAfter = uniqueForwardSurahs;
     const milestones = [5, 10, 20];
 
     setLeaderboardData(prevData => {
@@ -719,6 +901,14 @@ const App = () => {
         currentTotalCorrectCount = 1;
       }
       newData.totalCorrectSurahs.sort((a, b) => b.count - a.count);
+      forwardCountAfter = currentTotalCorrectCount;
+
+      uniqueForwardAfter = Object.entries(newData.surahTimes || {}).filter(([, entry]) => {
+        const best = getBestSurahTimeEntry(entry);
+        return best && best.username === usernameToRecord;
+      }).length;
+
+      addOverallPoints(newData, usernameToRecord, pointsEarned);
 
       // Check for milestones
       for (const ms of milestones) {
@@ -737,8 +927,16 @@ const App = () => {
       return newData;
     });
 
-    // Also store this completion on the server for shared leaderboards
-    recordProgressOnServer(surahNumber, timeTaken);
+    applyGamificationRewards({
+      surahNumber,
+      timeTaken,
+      pointsEarned,
+      personalBestAchieved,
+      forwardCountAfter,
+      uniqueForwardAfter,
+      justUnlockedReverse,
+      justUnlockedElite: false,
+    });
 
     setTimeout(() => {
       if (personalBestAchieved) {
@@ -776,12 +974,13 @@ const App = () => {
   };
 
   /** Record a reverse (السابقون) surah completion; Elite unlocks at 3 unique reverse wins */
-  const updateReverseLeaderboards = (surahNumber, timeTaken) => {
+  const updateReverseLeaderboards = (surahNumber, timeTaken, pointsEarned = 0) => {
     if (!user) return;
     const usernameToRecord = displayNameForUser(profileUsername, user);
 
     let personalBestAchieved = false;
     let justUnlockedElite = false;
+    let reverseCountAfter = reverseCount;
 
     setLeaderboardData((prevData) => {
       const newData = normalizeLeaderboards(JSON.parse(JSON.stringify(prevData)));
@@ -826,6 +1025,9 @@ const App = () => {
         currentReverseCount = 1;
       }
       newData.reverseCompletedSurahs.sort((a, b) => b.count - a.count);
+      reverseCountAfter = currentReverseCount;
+
+      addOverallPoints(newData, usernameToRecord, pointsEarned);
 
       if (oldReverseCount < ELITE_UNLOCK_COUNT && currentReverseCount >= ELITE_UNLOCK_COUNT) {
         justUnlockedElite = true;
@@ -835,8 +1037,15 @@ const App = () => {
       return newData;
     });
 
-    // Server progress table is shared for forward and reverse completions
-    recordProgressOnServer(surahNumber, timeTaken);
+    applyGamificationRewards({
+      surahNumber,
+      timeTaken,
+      pointsEarned,
+      personalBestAchieved,
+      reverseCountAfter,
+      justUnlockedReverse: false,
+      justUnlockedElite,
+    });
 
     setTimeout(() => {
       if (personalBestAchieved) {
@@ -942,15 +1151,12 @@ const App = () => {
   };
 
   /** Send a completion to the server so shared leaderboards can fill in */
-  const recordProgressOnServer = async (surahNumber, timeTaken) => {
+  const recordProgressOnServer = async (surahNumber, timeTaken, _pointsEarned = 0, extras = {}) => {
     const surahIdNum = parseInt(surahNumber, 10);
-    // Timer ticks once per second, so a fast finish can still be 0 locally —
-    // the DB requires a positive duration, so store at least 1 second.
     const durationNum = Math.max(1, Math.round(Number(timeTaken) || 0));
     if (isNaN(surahIdNum) || surahIdNum <= 0) return;
 
     try {
-      // Read a fresh session at call time (avoid stale closure after login)
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       if (!token) {
@@ -963,6 +1169,14 @@ const App = () => {
         body: {
           surah_id: surahIdNum,
           duration_seconds: durationNum,
+          ayah_count: cards.length || 1,
+          card_count: visibleCardCount,
+          difficulty,
+          play_direction: playDirection,
+          stopwatch_enabled: stopwatchEnabled,
+          badge_ids: extras.badgeIds || [],
+          current_streak: extras.streak?.currentStreak ?? currentStreak,
+          last_play_date: extras.streak?.lastPlayDate ?? lastPlayDate,
         },
       });
       if (error) {
@@ -1123,10 +1337,7 @@ const App = () => {
   }
 
   const unplacedCards = cards.filter(card => !card.position);
-  // Only show up to 5 cards from the visible pool (in pool order)
-  const visibleCards = visiblePoolIds
-    .map((id) => cards.find((c) => c.id === id && c.position === null))
-    .filter(Boolean);
+  const visibleCards = choiceCards;
 
   return (
     <Box data-elite={isElite ? 'true' : undefined} minHeight="100vh" position="relative">
@@ -1269,6 +1480,35 @@ const App = () => {
             </HStack>
           </Flex>
 
+          {/* Badge shelf — logged-in reward gallery */}
+          {user && !gameStarted && (
+            <Box
+              w="100%"
+              bg={colorMode === 'dark' ? 'rgba(34, 66, 63, 0.4)' : 'rgba(255, 255, 255, 0.5)'}
+              backdropFilter="blur(12px)"
+              border="1px solid"
+              borderColor={
+                isElite
+                  ? colorMode === 'dark'
+                    ? 'elite.400'
+                    : 'elite.300'
+                  : colorMode === 'dark'
+                    ? 'whiteAlpha.200'
+                    : 'mist.200'
+              }
+              borderRadius={{ base: 'lg', md: 'xl' }}
+              px={{ base: 3, md: 5 }}
+              py={{ base: 3, md: 4 }}
+            >
+              <BadgeShelf
+                earnedIds={earnedBadgeIds}
+                newlyEarnedIds={newlyEarnedBadgeIds}
+                currentStreak={currentStreak}
+                uniqueForwardSurahs={uniqueForwardSurahs}
+              />
+            </Box>
+          )}
+
           {/* Controls panel — denser on mobile so the game starts higher on screen */}
           <Box
             w="100%"
@@ -1335,6 +1575,58 @@ const App = () => {
               {/* Hide attempt/direction while playing — they are locked anyway */}
               {!gameStarted && (
                 <>
+                  <FormControl>
+                    <FormLabel fontSize="xs" mb={1.5} textAlign={{ base: 'left', sm: 'center' }} fontWeight="600">
+                      Level
+                    </FormLabel>
+                    <HStack justify="center" spacing={2} flexWrap="wrap">
+                      {[
+                        { value: 'beginner', label: 'Beginner' },
+                        { value: 'experienced', label: 'Experienced' },
+                      ].map((opt) => (
+                        <Button
+                          key={opt.value}
+                          size="sm"
+                          variant={difficulty === opt.value ? 'solid' : 'outline'}
+                          colorScheme="teal"
+                          onClick={() => setDifficulty(opt.value)}
+                          isDisabled={gameStarted}
+                        >
+                          {opt.label}
+                        </Button>
+                      ))}
+                    </HStack>
+                    <Text fontSize="xs" mt={1.5} textAlign="center" color={colorMode === 'dark' ? 'whiteAlpha.600' : 'mist.500'}>
+                      {difficulty === 'beginner'
+                        ? 'Choices from this surah only'
+                        : 'Wrong choices can be from other Juz Amma surahs'}
+                    </Text>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel fontSize="xs" mb={1.5} textAlign={{ base: 'left', sm: 'center' }} fontWeight="600">
+                      Choices shown
+                    </FormLabel>
+                    <HStack justify="center" spacing={2}>
+                      {[3, 4, 5].map((n) => (
+                        <Button
+                          key={n}
+                          size="sm"
+                          variant={visibleCardCount === n ? 'solid' : 'outline'}
+                          colorScheme="teal"
+                          onClick={() => setVisibleCardCount(n)}
+                          isDisabled={gameStarted}
+                          minW="44px"
+                        >
+                          {n}
+                        </Button>
+                      ))}
+                    </HStack>
+                    <Text fontSize="xs" mt={1.5} textAlign="center" color={colorMode === 'dark' ? 'whiteAlpha.600' : 'mist.500'}>
+                      More choices = harder (and more points)
+                    </Text>
+                  </FormControl>
+
                   <FormControl>
                     <FormLabel fontSize="xs" mb={1.5} textAlign={{ base: 'left', sm: 'center' }} fontWeight="600">
                       Attempt limit
@@ -1487,7 +1779,7 @@ const App = () => {
                 >
                   Tap the next ayah
                 </Text>
-                {unplacedCards.length > MAX_VISIBLE_CARDS && (
+                {unplacedCards.length > visibleCardCount && (
                   <Text
                     fontSize="xs"
                     mb={{ base: 2, md: 3 }}
@@ -1495,13 +1787,14 @@ const App = () => {
                     textAlign="center"
                   >
                     Showing {visibleCards.length} of {unplacedCards.length} remaining
+                    {difficulty === 'experienced' ? ' (+ other surahs)' : ''}
                   </Text>
                 )}
                 <SimpleGrid
                   columns={{ base: 1, sm: 2, md: Math.min(3, visibleCards.length || 1) }}
                   spacing={{ base: 2, md: 3 }}
                   w="100%"
-                  mt={unplacedCards.length > MAX_VISIBLE_CARDS ? 0 : { base: 2, md: 3 }}
+                  mt={unplacedCards.length > visibleCardCount ? 0 : { base: 2, md: 3 }}
                 >
                   {visibleCards.map((card) => {
                     const status =
@@ -1512,7 +1805,7 @@ const App = () => {
                         ayah={card.text}
                         status={status}
                         onTap={() => handleCardTap(card.id)}
-                        isFaceDown={card.isFaceDown}
+                        isFaceDown={false}
                         isElite={isElite}
                       />
                     );
@@ -1535,6 +1828,9 @@ const App = () => {
         forwardCount={forwardCount}
         reverseCount={reverseCount}
         isElite={isElite}
+        earnedBadgeIds={earnedBadgeIds}
+        currentStreak={currentStreak}
+        uniqueForwardSurahs={uniqueForwardSurahs}
       />
 
       <Modal isOpen={isAuthModalOpen} onClose={() => { onAuthModalClose(); setEmailInput(''); setPasswordInput(''); setUsernameInput(''); }} isCentered>
@@ -1609,8 +1905,9 @@ const App = () => {
           <ModalBody>
             <Tabs isFitted variant="enclosed">
               <TabList>
-                <Tab>Total Correct Surahs</Tab>
-                <Tab>Fastest Times</Tab>
+                <Tab fontSize={{ base: 'xs', md: 'sm' }}>Correct Surahs</Tab>
+                <Tab fontSize={{ base: 'xs', md: 'sm' }}>Fastest Times</Tab>
+                <Tab fontSize={{ base: 'xs', md: 'sm' }}>Overall Points</Tab>
               </TabList>
               <TabPanels>
                 <TabPanel>
@@ -1645,6 +1942,9 @@ const App = () => {
                   </TableContainer>
                 </TabPanel>
                 <TabPanel>
+                <Text fontSize="xs" mb={3} color="gray.500">
+                  Times are not weighted by difficulty.
+                </Text>
                 <TableContainer>
                   <Table variant="simple">
                     <Thead>
@@ -1679,6 +1979,40 @@ const App = () => {
                     </Tbody>
                   </Table>
                 </TableContainer>
+                </TabPanel>
+                <TabPanel>
+                  <Text fontSize="xs" mb={3} color="gray.500">
+                    Weighted by level, choices shown, and direction.
+                  </Text>
+                  <TableContainer>
+                    <Table variant="simple">
+                      <Thead>
+                        <Tr>
+                          <Th>Rank</Th>
+                          <Th>Username</Th>
+                          <Th>Points</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {Array.isArray(leaderboardData.overallPoints) &&
+                        leaderboardData.overallPoints.filter(
+                          (e) => e?.username && !looksLikeEmail(e.username)
+                        ).length > 0 ? (
+                          leaderboardData.overallPoints
+                            .filter((e) => e?.username && !looksLikeEmail(e.username))
+                            .map((entry, index) => (
+                              <Tr key={index}>
+                                <Td>{index + 1}</Td>
+                                <Td>{entry.username || 'Anonymous'}</Td>
+                                <Td>{entry.points}</Td>
+                              </Tr>
+                            ))
+                        ) : (
+                          <Tr><Td colSpan="3">No data available.</Td></Tr>
+                        )}
+                      </Tbody>
+                    </Table>
+                  </TableContainer>
                 </TabPanel>
               </TabPanels>
             </Tabs>
