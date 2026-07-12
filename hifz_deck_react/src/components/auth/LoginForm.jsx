@@ -37,23 +37,16 @@ export default function LoginForm() {
         duration: 5000,
         isClosable: true,
       })
-    } else if (data && data.user && data.session) {
+    } else if (!(data && data.user && data.session)) {
       toast({
-        title: 'Welcome back',
-        description: 'You are now logged in.',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-    } else {
-      toast({
-        title: 'Login attempted',
+        title: 'Login failed',
         description: 'Please check your credentials or try again.',
         status: 'warning',
         duration: 5000,
         isClosable: true,
       })
     }
+    // Successful login: modal closes — no "welcome back" toast
   }
 
   const handleForgotPassword = async () => {

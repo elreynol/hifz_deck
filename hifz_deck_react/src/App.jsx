@@ -44,6 +44,42 @@ import {
 
 // السابقون unlock thresholds
 const REVERSE_UNLOCK_COUNT = 10; // forward completions to unlock reverse
+
+/** One-line description for a completed run (keeps toast count down). */
+function buildRunSummaryDescription({
+  recordedTime,
+  pointsEarned,
+  personalBestAchieved,
+  surahName,
+  surahFullyComplete,
+  juzComplete,
+  completedJuzAfter,
+  milestone,
+  justUnlockedReverse,
+  justUnlockedElite,
+  newBadgeIds = [],
+}) {
+  const parts = [`${recordedTime} · +${pointsEarned} pts`];
+  if (personalBestAchieved) parts.push('Personal best');
+  if (surahFullyComplete && surahName) parts.push(`Full surah: ${surahName}`);
+  if (juzComplete) {
+    parts.push(
+      typeof completedJuzAfter === 'number'
+        ? `Juz' cleared (${completedJuzAfter}/30)`
+        : "Juz' cleared"
+    );
+  }
+  if (milestone) parts.push(`${milestone} sections done`);
+  if (justUnlockedReverse) parts.push('السابقون path unlocked');
+  if (justUnlockedElite) parts.push('Elite unlocked');
+  if (newBadgeIds.length === 1) {
+    const title = BADGE_BY_ID[newBadgeIds[0]]?.title;
+    if (title) parts.push(`Badge: ${title}`);
+  } else if (newBadgeIds.length > 1) {
+    parts.push(`${newBadgeIds.length} badges unlocked`);
+  }
+  return parts.join(' · ');
+}
 const ELITE_UNLOCK_COUNT = 3;    // reverse completions for Elite status
 
 const BADGES_STORAGE_KEY = 'hifzDeckBadges';
@@ -920,14 +956,6 @@ const App = () => {
           playDirection,
           stopwatchEnabled,
         });
-        toast({
-          title: playDirection === 'reverse' ? 'السابقون — Correct!' : 'Correct!',
-          description: `Well done! Your time: ${recordedTime} · +${pointsEarned} pts`,
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-          position: 'top',
-        });
         if (user && selectedSurah) {
           const boardKey = `${selectedSurah}@h${selectedHizb}`;
           if (playDirection === 'reverse') {
@@ -935,6 +963,19 @@ const App = () => {
           } else {
             updateLeaderboards(boardKey, elapsedSeconds, pointsEarned);
           }
+        } else {
+          // Guests: one summary toast (logged-in path toasts inside update*Leaderboards)
+          toast({
+            title: playDirection === 'reverse' ? 'السابقون complete' : 'Section complete',
+            description: buildRunSummaryDescription({
+              recordedTime,
+              pointsEarned,
+            }),
+            status: 'success',
+            duration: 5000,
+            isClosable: true,
+            position: 'top',
+          });
         }
       } else {
         const newExpected = getAdvancedVerse(nextExpectedVerse, updatedCards);
@@ -1005,10 +1046,7 @@ const App = () => {
 
   // Reshuffle which distractors appear in the visible pool (correct ayah stays included)
   const handleShuffle = () => {
-    if (!gameStarted) {
-      toast({ title: 'Start the game first!', status: 'info', duration: 2000, isClosable: true });
-      return;
-    }
+    if (!gameStarted) return; // No toast — start the game first
     setChoiceCards(refillChoices(cards, nextExpectedVerse));
   };
 
@@ -1087,18 +1125,7 @@ const App = () => {
       setEarnedBadgeIds(merged);
       setNewlyEarnedBadgeIds(newBadges);
       localStorage.setItem(BADGES_STORAGE_KEY, JSON.stringify(merged));
-      newBadges.forEach((id) => {
-        const badge = BADGE_BY_ID[id];
-        if (!badge) return;
-        toast({
-          title: 'Badge unlocked!',
-          description: badge.title,
-          status: 'success',
-          duration: 4000,
-          isClosable: true,
-          position: 'top-right',
-        });
-      });
+      // Badge names go into the single run-summary toast (shelf still highlights)
       setTimeout(() => setNewlyEarnedBadgeIds([]), 2500);
     }
 
@@ -1106,6 +1133,8 @@ const App = () => {
       badgeIds: newBadges,
       streak: streakNext,
     });
+
+    return newBadges;
   };
 
   const addOverallPoints = (data, usernameToRecord, pointsEarned) => {
@@ -1201,7 +1230,7 @@ const App = () => {
       return newData;
     });
 
-    applyGamificationRewards({
+    const newBadgeIds = applyGamificationRewards({
       surahNumber,
       timeTaken,
       pointsEarned,
@@ -1214,63 +1243,36 @@ const App = () => {
       justUnlockedElite: false,
     });
 
-    setTimeout(() => {
-      if (personalBestAchieved) {
-        const surahIdOnly = String(surahNumber).split('@')[0];
-        const surahName = sequence.find(s => s.number.toString() === surahIdOnly)?.name || 'this Surah';
-        toast({
-          title: 'Personal Best!',
-          description: `New speed record for ${surahName}! Time: ${formatTime(timeTaken)}`,
-          status: 'info',
-          duration: 4000,
-          isClosable: true,
-          position: 'top-right' 
-        });
-      }
-      if (uniqueForwardAfter > uniqueForwardSurahs) {
-        const surahIdOnly = String(surahNumber).split('@')[0];
-        const surahName =
-          sequence.find((s) => s.number.toString() === surahIdOnly)?.name || 'this surah';
-        toast({
-          title: 'Surah complete!',
-          description: `You finished every section of ${surahName}.`,
-          status: 'success',
-          duration: 4500,
-          isClosable: true,
-          position: 'top-right',
-        });
-      }
-      if (completedJuzAfter > completedJuzCount) {
-        toast({
-          title: "Juz' complete!",
-          description: `You cleared every section in a juz'. (${completedJuzAfter}/${30})`,
-          status: 'success',
-          duration: 4500,
-          isClosable: true,
-          position: 'top-right',
-        });
-      }
-      if (newTotalCorrectMilestone && newTotalCorrectMilestone !== REVERSE_UNLOCK_COUNT) {
-        toast({
-          title: 'Achievement Unlocked!',
-          description: `Congratulations! You've correctly completed ${newTotalCorrectMilestone} sections!`,
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-          position: 'top-right'
-        });
-      }
-      if (justUnlockedReverse) {
-        toast({
-          title: 'السابقون path unlocked!',
-          description: 'You can now play any surah backwards — from the last ayah to the first.',
-          status: 'success',
-          duration: 6000,
-          isClosable: true,
-          position: 'top-right',
-        });
-      }
-    }, 600);
+    const surahIdOnly = String(surahNumber).split('@')[0];
+    const surahName =
+      sequence.find((s) => s.number.toString() === surahIdOnly)?.name || 'this Surah';
+    const surahFullyComplete = uniqueForwardAfter > uniqueForwardSurahs;
+    const juzComplete = completedJuzAfter > completedJuzCount;
+    // Don't double-count the reverse-unlock milestone — it has its own summary line
+    const milestone =
+      newTotalCorrectMilestone && newTotalCorrectMilestone !== REVERSE_UNLOCK_COUNT
+        ? newTotalCorrectMilestone
+        : null;
+
+    toast({
+      title: 'Section complete',
+      description: buildRunSummaryDescription({
+        recordedTime: formatTime(timeTaken),
+        pointsEarned,
+        personalBestAchieved,
+        surahName,
+        surahFullyComplete,
+        juzComplete,
+        completedJuzAfter,
+        milestone,
+        justUnlockedReverse,
+        newBadgeIds: newBadgeIds || [],
+      }),
+      status: 'success',
+      duration: 5500,
+      isClosable: true,
+      position: 'top',
+    });
   };
 
   /** Record a reverse (السابقون) surah completion; Elite unlocks at 3 unique reverse wins */
@@ -1337,7 +1339,7 @@ const App = () => {
       return newData;
     });
 
-    applyGamificationRewards({
+    const newBadgeIds = applyGamificationRewards({
       surahNumber,
       timeTaken,
       pointsEarned,
@@ -1347,31 +1349,25 @@ const App = () => {
       justUnlockedElite,
     });
 
-    setTimeout(() => {
-      if (personalBestAchieved) {
-        const surahIdOnly = String(surahNumber).split('@')[0];
-        const surahName =
-          sequence.find((s) => s.number.toString() === surahIdOnly)?.name || 'this Surah';
-        toast({
-          title: 'السابقون Personal Best!',
-          description: `New reverse speed record for ${surahName}! Time: ${formatTime(timeTaken)}`,
-          status: 'info',
-          duration: 4000,
-          isClosable: true,
-          position: 'top-right',
-        });
-      }
-      if (justUnlockedElite) {
-        toast({
-          title: 'السابقون Elite unlocked!',
-          description: 'You have mastered the reverse path. Elite status is now active app-wide.',
-          status: 'success',
-          duration: 7000,
-          isClosable: true,
-          position: 'top-right',
-        });
-      }
-    }, 600);
+    const surahIdOnly = String(surahNumber).split('@')[0];
+    const surahName =
+      sequence.find((s) => s.number.toString() === surahIdOnly)?.name || 'this Surah';
+
+    toast({
+      title: 'السابقون complete',
+      description: buildRunSummaryDescription({
+        recordedTime: formatTime(timeTaken),
+        pointsEarned,
+        personalBestAchieved,
+        surahName,
+        justUnlockedElite,
+        newBadgeIds: newBadgeIds || [],
+      }),
+      status: 'success',
+      duration: 5500,
+      isClosable: true,
+      position: 'top',
+    });
   };
 
   const handleModalSignup = async () => {
@@ -1392,7 +1388,7 @@ const App = () => {
 
     if (error) {
       toast({ title: 'Signup Error', description: error.message, status: 'error', duration: 5000, isClosable: true });
-    } else if (data && data.user && !data.session && data.user.email_confirmed_at === null) { 
+    } else if (data && data.user && !data.session && data.user.email_confirmed_at === null) {
         toast({
             title: 'Signup Successful',
             description: 'Please check your email to confirm your account.',
@@ -1400,19 +1396,11 @@ const App = () => {
             duration: 5000,
             isClosable: true,
         });
-    } else {
-      toast({ title: 'Signup Initiated', description: 'Processing signup...', status: 'success', duration: 3000, isClosable: true });
     }
+    // No "processing" toast — the button loading state is enough
   };
 
   const handleSyncLeaderboard = async () => {
-    toast({
-      title: 'Syncing Leaderboard',
-      description: 'Fetching latest scores from the server...',
-      status: 'info',
-      duration: 2000,
-      isClosable: true,
-    });
     try {
       // Must be GET — the edge function rejects POST with 405
       const { data, error } = await supabase.functions.invoke('leaderboard', {
@@ -1429,12 +1417,7 @@ const App = () => {
         );
         setLeaderboardData(merged);
         localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(merged));
-        toast({
-          title: 'Leaderboard Synced!',
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
+        // Synced state shows in the table — skip success toast
       }
     } catch (error) {
       toast({
