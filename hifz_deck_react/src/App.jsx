@@ -40,9 +40,192 @@ const normalizeLeaderboards = (data) => ({
   reverseCompletedSurahs: Array.isArray(data?.reverseCompletedSurahs) ? data.reverseCompletedSurahs : [],
 });
 
-const getUserCount = (list, username) => {
-  const entry = (list || []).find((e) => e.username === username);
-  return entry ? entry.count : 0;
+const getUserCount = (list, ...aliases) => {
+  const keys = aliases.filter(Boolean);
+  if (keys.length === 0) return 0;
+  return (list || []).reduce((max, entry) => {
+    if (entry?.username && keys.includes(entry.username)) {
+      return Math.max(max, Number(entry.count) || 0);
+    }
+    return max;
+  }, 0);
+};
+
+const looksLikeEmail = (value) =>
+  typeof value === 'string' && value.includes('@');
+
+/** Prefer a public username; never expose raw email on the board */
+const displayNameForUser = (profileUsername, user) => {
+  if (profileUsername && !looksLikeEmail(profileUsername)) return profileUsername;
+  const metaName = user?.user_metadata?.username;
+  if (metaName && !looksLikeEmail(metaName)) return metaName;
+  return 'Anonymous';
+};
+
+/**
+ * Collapse duplicate rows that used email as the key into the public username.
+ * Keeps the higher count / faster time.
+ */
+const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
+  const normalized = normalizeLeaderboards(data);
+  if (!publicUsername || looksLikeEmail(publicUsername)) return normalized;
+
+  const aliases = new Set(
+    [...(emailAliases || []), publicUsername].filter(Boolean)
+  );
+
+  const mergeCountList = (list) => {
+    let best = 0;
+    const others = [];
+    (list || []).forEach((entry) => {
+      if (entry?.username && aliases.has(entry.username)) {
+        best = Math.max(best, Number(entry.count) || 0);
+      } else if (entry?.username && !looksLikeEmail(entry.username)) {
+        others.push(entry);
+      }
+      // Drop any leftover bare-email rows that aren't this user
+      else if (entry?.username && looksLikeEmail(entry.username)) {
+        // skip — never show emails
+      } else if (entry) {
+        others.push(entry);
+      }
+    });
+    if (best > 0 || (list || []).some((e) => e?.username && aliases.has(e.username))) {
+      others.push({ username: publicUsername, count: best });
+    }
+    return others.sort((a, b) => b.count - a.count);
+  };
+
+  const mergeTimeBucket = (bucket) => {
+    if (!bucket) return bucket;
+    if (Array.isArray(bucket)) {
+      let bestForUser = null;
+      const others = [];
+      bucket.forEach((entry) => {
+        if (entry?.username && aliases.has(entry.username)) {
+          if (!bestForUser || entry.time < bestForUser.time) {
+            bestForUser = { username: publicUsername, time: entry.time };
+          }
+        } else if (entry?.username && !looksLikeEmail(entry.username)) {
+          others.push(entry);
+        }
+      });
+      if (bestForUser) others.push(bestForUser);
+      return others.sort((a, b) => a.time - b.time);
+    }
+    if (looksLikeEmail(bucket.username) || aliases.has(bucket.username)) {
+      return { username: publicUsername, time: bucket.time };
+    }
+    if (looksLikeEmail(bucket.username)) return null;
+    return bucket;
+  };
+
+  const remapTimes = (times) => {
+    const out = {};
+    Object.entries(times || {}).forEach(([surah, bucket]) => {
+      const next = mergeTimeBucket(bucket);
+      if (next && !(Array.isArray(next) && next.length === 0)) {
+        out[surah] = next;
+      }
+    });
+    return out;
+  };
+
+  return {
+    ...normalized,
+    totalCorrectSurahs: mergeCountList(normalized.totalCorrectSurahs),
+    reverseCompletedSurahs: mergeCountList(normalized.reverseCompletedSurahs),
+    surahTimes: remapTimes(normalized.surahTimes),
+    reverseSurahTimes: remapTimes(normalized.reverseSurahTimes),
+  };
+};
+
+/** Local stores per-surah time lists; server stores a single best {username,time}. Normalize for UI. */
+const getBestSurahTimeEntry = (entry) => {
+  if (!entry) return null;
+  if (Array.isArray(entry)) {
+    if (entry.length === 0) return null;
+    return [...entry].sort((a, b) => a.time - b.time)[0];
+  }
+  if (typeof entry === 'object' && typeof entry.time === 'number') return entry;
+  return null;
+};
+
+/** Prefer higher counts and faster times when combining local + server boards */
+const mergeLeaderboards = (localData, serverData, emailAliases = [], publicUsername = null) => {
+  const local = consolidateLeaderboardIdentity(
+    localData,
+    emailAliases,
+    publicUsername || 'Anonymous'
+  );
+  const server = consolidateLeaderboardIdentity(
+    serverData,
+    emailAliases,
+    publicUsername || 'Anonymous'
+  );
+  const merged = normalizeLeaderboards(local);
+
+  const mergeCountLists = (a, b) => {
+    const map = new Map();
+    [...(a || []), ...(b || [])].forEach((entry) => {
+      if (!entry?.username || looksLikeEmail(entry.username)) return;
+      const prev = map.get(entry.username);
+      const count = Number(entry.count) || 0;
+      if (!prev || count > prev.count) {
+        map.set(entry.username, { username: entry.username, count });
+      }
+    });
+    return Array.from(map.values()).sort((x, y) => y.count - x.count);
+  };
+
+  const mergeSurahTimes = (a, b) => {
+    const out = {};
+    const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+    keys.forEach((surah) => {
+      const localBest = getBestSurahTimeEntry(a?.[surah]);
+      const serverBest = getBestSurahTimeEntry(b?.[surah]);
+      if (Array.isArray(a?.[surah]) && a[surah].length > 0) {
+        const list = a[surah]
+          .filter((e) => e?.username && !looksLikeEmail(e.username))
+          .map((e) => ({ ...e }));
+        if (serverBest && !looksLikeEmail(serverBest.username)) {
+          const idx = list.findIndex((e) => e.username === serverBest.username);
+          if (idx === -1) list.push(serverBest);
+          else if (serverBest.time < list[idx].time) list[idx] = serverBest;
+        }
+        out[surah] = list.sort((x, y) => x.time - y.time);
+      } else if (localBest && serverBest) {
+        const left = looksLikeEmail(localBest.username) ? null : localBest;
+        const right = looksLikeEmail(serverBest.username) ? null : serverBest;
+        if (left && right) {
+          out[surah] = left.time <= right.time ? left : right;
+        } else {
+          out[surah] = left || right;
+        }
+      } else {
+        const only = localBest || serverBest;
+        if (only && !looksLikeEmail(only.username)) out[surah] = only;
+      }
+    });
+    return out;
+  };
+
+  merged.totalCorrectSurahs = mergeCountLists(
+    local.totalCorrectSurahs,
+    server.totalCorrectSurahs
+  );
+  merged.reverseCompletedSurahs = mergeCountLists(
+    local.reverseCompletedSurahs,
+    server.reverseCompletedSurahs
+  );
+  merged.surahTimes = mergeSurahTimes(local.surahTimes, server.surahTimes);
+  merged.reverseSurahTimes = mergeSurahTimes(
+    local.reverseSurahTimes,
+    server.reverseSurahTimes
+  );
+  return publicUsername
+    ? consolidateLeaderboardIdentity(merged, emailAliases, publicUsername)
+    : merged;
 };
 
 // Soft entrance for the main composition
@@ -93,6 +276,8 @@ const App = () => {
   const [passwordInput, setPasswordInput] = useState('');
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
+  // Public name for leaderboards — never the email address
+  const [profileUsername, setProfileUsername] = useState(null);
 
   // Leaderboard state (includes reverse / السابقون progress)
   const { isOpen: isLeaderboardModalOpen, onOpen: onLeaderboardModalOpen, onClose: onLeaderboardModalClose } = useDisclosure();
@@ -125,6 +310,47 @@ const App = () => {
       localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(EMPTY_LEADERBOARDS));
     }
   }, []);
+
+  // Load profile username and rewrite any email-keyed local scores
+  useEffect(() => {
+    if (!user) {
+      setProfileUsername(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        const name = displayNameForUser(data?.username, user);
+        setProfileUsername(name);
+
+        setLeaderboardData((prev) => {
+          const cleaned = consolidateLeaderboardIdentity(
+            prev,
+            [user.email],
+            name
+          );
+          localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(cleaned));
+          return cleaned;
+        });
+      } catch (err) {
+        console.error('Failed to load profile username:', err);
+        if (!cancelled) {
+          setProfileUsername(displayNameForUser(null, user));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // If reverse becomes locked (e.g. logout), force forward direction
   useEffect(() => {
@@ -205,11 +431,22 @@ const App = () => {
   }, []);
 
   // Derived السابقون unlock / Elite flags from local leaderboard progress
+  const boardName = displayNameForUser(profileUsername, user);
   const forwardCount = user
-    ? getUserCount(leaderboardData.totalCorrectSurahs, user.email)
+    ? getUserCount(
+        leaderboardData.totalCorrectSurahs,
+        boardName,
+        user.email,
+        profileUsername
+      )
     : 0;
   const reverseCount = user
-    ? getUserCount(leaderboardData.reverseCompletedSurahs, user.email)
+    ? getUserCount(
+        leaderboardData.reverseCompletedSurahs,
+        boardName,
+        user.email,
+        profileUsername
+      )
     : 0;
   const reverseUnlocked = !!user && forwardCount >= REVERSE_UNLOCK_COUNT;
   const isElite = !!user && reverseCount >= ELITE_UNLOCK_COUNT;
@@ -322,7 +559,9 @@ const App = () => {
       if (allDone) {
         setVisiblePoolIds([]);
         setTimerActive(false);
-        const recordedTime = formatTime(time);
+        // Capture seconds now; timer may still be 0 on a very fast clear
+        const elapsedSeconds = Math.max(1, time);
+        const recordedTime = formatTime(elapsedSeconds);
         toast({
           title: playDirection === 'reverse' ? 'السابقون — Correct!' : 'Correct!',
           description: `Well done! Your time: ${recordedTime}`,
@@ -333,9 +572,9 @@ const App = () => {
         });
         if (user && selectedSurah) {
           if (playDirection === 'reverse') {
-            updateReverseLeaderboards(selectedSurah, time);
+            updateReverseLeaderboards(selectedSurah, elapsedSeconds);
           } else {
-            updateLeaderboards(selectedSurah, time);
+            updateLeaderboards(selectedSurah, elapsedSeconds);
           }
         }
       } else {
@@ -430,7 +669,7 @@ const App = () => {
 
   const updateLeaderboards = (surahNumber, timeTaken) => {
     if (!user) return;
-    const usernameToRecord = user.email;
+    const usernameToRecord = displayNameForUser(profileUsername, user);
 
     let personalBestAchieved = false;
     let newTotalCorrectMilestone = null;
@@ -498,6 +737,9 @@ const App = () => {
       return newData;
     });
 
+    // Also store this completion on the server for shared leaderboards
+    recordProgressOnServer(surahNumber, timeTaken);
+
     setTimeout(() => {
       if (personalBestAchieved) {
         const surahName = sequence.find(s => s.number.toString() === surahNumber)?.name || 'this Surah';
@@ -536,7 +778,7 @@ const App = () => {
   /** Record a reverse (السابقون) surah completion; Elite unlocks at 3 unique reverse wins */
   const updateReverseLeaderboards = (surahNumber, timeTaken) => {
     if (!user) return;
-    const usernameToRecord = user.email;
+    const usernameToRecord = displayNameForUser(profileUsername, user);
 
     let personalBestAchieved = false;
     let justUnlockedElite = false;
@@ -592,6 +834,9 @@ const App = () => {
       localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(newData));
       return newData;
     });
+
+    // Server progress table is shared for forward and reverse completions
+    recordProgressOnServer(surahNumber, timeTaken);
 
     setTimeout(() => {
       if (personalBestAchieved) {
@@ -663,14 +908,21 @@ const App = () => {
       isClosable: true,
     });
     try {
-      const { data, error } = await supabase.functions.invoke('leaderboard');
+      // Must be GET — the edge function rejects POST with 405
+      const { data, error } = await supabase.functions.invoke('leaderboard', {
+        method: 'GET',
+      });
       if (error) throw error;
-      
-      // Assuming the function returns an object with leaderboard data
+
       if (data) {
-        const normalized = normalizeLeaderboards(data);
-        setLeaderboardData(normalized);
-        localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(normalized));
+        const merged = mergeLeaderboards(
+          leaderboardData,
+          data,
+          user?.email ? [user.email] : [],
+          boardName
+        );
+        setLeaderboardData(merged);
+        localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(merged));
         toast({
           title: 'Leaderboard Synced!',
           status: 'success',
@@ -681,11 +933,52 @@ const App = () => {
     } catch (error) {
       toast({
         title: 'Sync Failed',
-        description: error.message,
+        description: error.message || String(error),
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
+    }
+  };
+
+  /** Send a completion to the server so shared leaderboards can fill in */
+  const recordProgressOnServer = async (surahNumber, timeTaken) => {
+    const surahIdNum = parseInt(surahNumber, 10);
+    // Timer ticks once per second, so a fast finish can still be 0 locally —
+    // the DB requires a positive duration, so store at least 1 second.
+    const durationNum = Math.max(1, Math.round(Number(timeTaken) || 0));
+    if (isNaN(surahIdNum) || surahIdNum <= 0) return;
+
+    try {
+      // Read a fresh session at call time (avoid stale closure after login)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        console.warn('[progress] No access token; skipping server record');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('progress', {
+        headers: { Authorization: `Bearer ${token}` },
+        body: {
+          surah_id: surahIdNum,
+          duration_seconds: durationNum,
+        },
+      });
+      if (error) {
+        console.error('Failed to record progress on server:', error);
+        toast({
+          title: 'Score saved locally only',
+          description: error.message || 'Could not sync this run to the server leaderboard.',
+          status: 'warning',
+          duration: 4000,
+          isClosable: true,
+        });
+        return;
+      }
+      console.log('[progress] Recorded on server:', data);
+    } catch (err) {
+      console.error('Failed to send progress request:', err);
     }
   };
 
@@ -769,19 +1062,34 @@ const App = () => {
     setIsLeaderboardLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('leaderboard', {
-        method: 'GET' // Specify the GET method
+        method: 'GET',
       });
 
       if (error) {
         throw error;
       }
       console.log("[App.jsx] Leaderboard data received:", data);
-      setLeaderboardData(normalizeLeaderboards(data));
-      // toast({ title: 'Leaderboard Loaded', status: 'success', duration: 2000, isClosable: true });
+      // Merge with local progress so an empty server board does not wipe scores
+      setLeaderboardData((prev) => {
+        const merged = mergeLeaderboards(
+          prev,
+          data,
+          user?.email ? [user.email] : [],
+          displayNameForUser(profileUsername, user)
+        );
+        localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(merged));
+        return merged;
+      });
     } catch (err) {
       console.error("Error fetching leaderboard:", err);
-      toast({ title: 'Error Fetching Leaderboard', description: err.message, status: 'error', duration: 3000, isClosable: true });
-      setLeaderboardData(EMPTY_LEADERBOARDS); 
+      toast({
+        title: 'Error Fetching Leaderboard',
+        description: err.message || String(err),
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      // Keep whatever local scores we already have
     } finally {
       setIsLeaderboardLoading(false);
     }
@@ -1316,8 +1624,13 @@ const App = () => {
                         </Tr>
                       </Thead>
                       <Tbody>
-                        {Array.isArray(leaderboardData.totalCorrectSurahs) && leaderboardData.totalCorrectSurahs.length > 0 ? (
-                          leaderboardData.totalCorrectSurahs.map((entry, index) => (
+                        {Array.isArray(leaderboardData.totalCorrectSurahs) &&
+                        leaderboardData.totalCorrectSurahs.filter(
+                          (e) => e?.username && !looksLikeEmail(e.username)
+                        ).length > 0 ? (
+                          leaderboardData.totalCorrectSurahs
+                            .filter((e) => e?.username && !looksLikeEmail(e.username))
+                            .map((entry, index) => (
                             <Tr key={index}>
                               <Td>{index + 1}</Td>
                               <Td>{entry.username || 'Anonymous'}</Td>
@@ -1344,7 +1657,15 @@ const App = () => {
                     <Tbody>
                       {Object.entries(leaderboardData.surahTimes).length > 0 ? (
                         Object.entries(leaderboardData.surahTimes)
-                          .sort(([, a], [, b]) => a.time - b.time) 
+                          .map(([surah, entry]) => [surah, getBestSurahTimeEntry(entry)])
+                          .filter(
+                            ([, data]) =>
+                              data &&
+                              typeof data.time === 'number' &&
+                              data.username &&
+                              !looksLikeEmail(data.username)
+                          )
+                          .sort(([, a], [, b]) => a.time - b.time)
                           .map(([surah, data], index) => (
                             <Tr key={index}>
                               <Td>{surah}</Td>
