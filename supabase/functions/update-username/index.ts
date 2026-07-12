@@ -89,6 +89,11 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    if (/^YOUR_[A-Z0-9_]+$/i.test(newUsername) || /^<.*>$/.test(newUsername)) {
+      return new Response(JSON.stringify({ error: 'Username cannot be a placeholder value.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   } catch (error) {
     console.error("[update-username] Error parsing request body:", error);
     return new Response(JSON.stringify({ error: 'Invalid request body. Please send JSON with new_username.' }), {

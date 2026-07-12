@@ -74,6 +74,12 @@ Deno.serve(async (req: Request) => {
 
     if (providedUsername && providedUsername.trim().length >= 3) {
       finalUsername = providedUsername.trim();
+      if (finalUsername.includes('@') || /^YOUR_[A-Z0-9_]+$/i.test(finalUsername) || /^<.*>$/.test(finalUsername)) {
+        return new Response(JSON.stringify({ error: 'Please choose a public username (not an email or placeholder).' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     } else {
       const emailParts = email.split('@');
       finalUsername = emailParts[0];

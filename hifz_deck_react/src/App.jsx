@@ -83,11 +83,115 @@ const getUserCount = (list, ...aliases) => {
 const looksLikeEmail = (value) =>
   typeof value === 'string' && value.includes('@');
 
+/**
+ * Tutorial / console-snippet placeholders that sometimes get pasted into
+ * localStorage as a "username" (e.g. YOUR_EMAIL_HERE from unlock instructions).
+ * These are not real public names and must never appear on the board.
+ */
+const isPlaceholderUsername = (value) => {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^YOUR_[A-Z0-9_]+$/i.test(trimmed)) return true;
+  if (/^<.*>$/.test(trimmed)) return true;
+  return false;
+};
+
+/** Names that should never be shown or stored as public leaderboard identities */
+const isHiddenLeaderboardUsername = (value) =>
+  looksLikeEmail(value) || isPlaceholderUsername(value);
+
+/**
+ * Drop placeholder / email-looking rows from local leaderboard caches.
+ * When publicUsername is provided, fold those rows into that name instead.
+ */
+const scrubHiddenLeaderboardUsernames = (data, publicUsername = null) => {
+  const normalized = normalizeLeaderboards(data);
+  const keepName =
+    publicUsername && !isHiddenLeaderboardUsername(publicUsername)
+      ? publicUsername
+      : null;
+
+  const scrubCountList = (list, valueKey) => {
+    let folded = 0;
+    const others = [];
+    (list || []).forEach((entry) => {
+      if (!entry?.username) return;
+      if (isHiddenLeaderboardUsername(entry.username)) {
+        folded = Math.max(folded, Number(entry[valueKey]) || 0);
+        return;
+      }
+      others.push(entry);
+    });
+    if (keepName && folded > 0) {
+      const idx = others.findIndex((e) => e.username === keepName);
+      if (idx === -1) others.push({ username: keepName, [valueKey]: folded });
+      else {
+        others[idx] = {
+          ...others[idx],
+          [valueKey]: Math.max(Number(others[idx][valueKey]) || 0, folded),
+        };
+      }
+    }
+    return others.sort((a, b) => (Number(b[valueKey]) || 0) - (Number(a[valueKey]) || 0));
+  };
+
+  const scrubTimeBucket = (bucket) => {
+    if (!bucket) return bucket;
+    if (Array.isArray(bucket)) {
+      let folded = null;
+      const others = [];
+      bucket.forEach((entry) => {
+        if (!entry?.username) return;
+        if (isHiddenLeaderboardUsername(entry.username)) {
+          if (!folded || entry.time < folded.time) {
+            folded = { username: keepName || 'Anonymous', time: entry.time };
+          }
+          return;
+        }
+        others.push(entry);
+      });
+      if (keepName && folded) {
+        const idx = others.findIndex((e) => e.username === keepName);
+        if (idx === -1) others.push({ username: keepName, time: folded.time });
+        else if (folded.time < others[idx].time) {
+          others[idx] = { username: keepName, time: folded.time };
+        }
+      }
+      return others.sort((a, b) => a.time - b.time);
+    }
+    if (isHiddenLeaderboardUsername(bucket.username)) {
+      return keepName ? { username: keepName, time: bucket.time } : null;
+    }
+    return bucket;
+  };
+
+  const scrubTimes = (times) => {
+    const out = {};
+    Object.entries(times || {}).forEach(([surah, bucket]) => {
+      const next = scrubTimeBucket(bucket);
+      if (next && !(Array.isArray(next) && next.length === 0)) out[surah] = next;
+    });
+    return out;
+  };
+
+  return {
+    ...normalized,
+    totalCorrectSurahs: scrubCountList(normalized.totalCorrectSurahs, 'count'),
+    reverseCompletedSurahs: scrubCountList(normalized.reverseCompletedSurahs, 'count'),
+    overallPoints: scrubCountList(normalized.overallPoints, 'points'),
+    surahTimes: scrubTimes(normalized.surahTimes),
+    reverseSurahTimes: scrubTimes(normalized.reverseSurahTimes),
+  };
+};
+
 /** Prefer a public username; never expose raw email on the board */
 const displayNameForUser = (profileUsername, user) => {
-  if (profileUsername && !looksLikeEmail(profileUsername)) return profileUsername;
+  if (profileUsername && !isHiddenLeaderboardUsername(profileUsername)) {
+    return profileUsername;
+  }
   const metaName = user?.user_metadata?.username;
-  if (metaName && !looksLikeEmail(metaName)) return metaName;
+  if (metaName && !isHiddenLeaderboardUsername(metaName)) return metaName;
   return 'Anonymous';
 };
 
@@ -96,8 +200,13 @@ const displayNameForUser = (profileUsername, user) => {
  * Keeps the higher count / faster time.
  */
 const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
-  const normalized = normalizeLeaderboards(data);
-  if (!publicUsername || looksLikeEmail(publicUsername)) return normalized;
+  const normalized = scrubHiddenLeaderboardUsernames(
+    normalizeLeaderboards(data),
+    publicUsername
+  );
+  if (!publicUsername || isHiddenLeaderboardUsername(publicUsername)) {
+    return normalized;
+  }
 
   const aliases = new Set(
     [...(emailAliases || []), publicUsername].filter(Boolean)
@@ -109,12 +218,12 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
     (list || []).forEach((entry) => {
       if (entry?.username && aliases.has(entry.username)) {
         best = Math.max(best, Number(entry.count) || 0);
-      } else if (entry?.username && !looksLikeEmail(entry.username)) {
+      } else if (entry?.username && !isHiddenLeaderboardUsername(entry.username)) {
         others.push(entry);
       }
-      // Drop any leftover bare-email rows that aren't this user
-      else if (entry?.username && looksLikeEmail(entry.username)) {
-        // skip — never show emails
+      // Drop any leftover bare-email / placeholder rows that aren't this user
+      else if (entry?.username && isHiddenLeaderboardUsername(entry.username)) {
+        // skip
       } else if (entry) {
         others.push(entry);
       }
@@ -135,17 +244,17 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
           if (!bestForUser || entry.time < bestForUser.time) {
             bestForUser = { username: publicUsername, time: entry.time };
           }
-        } else if (entry?.username && !looksLikeEmail(entry.username)) {
+        } else if (entry?.username && !isHiddenLeaderboardUsername(entry.username)) {
           others.push(entry);
         }
       });
       if (bestForUser) others.push(bestForUser);
       return others.sort((a, b) => a.time - b.time);
     }
-    if (looksLikeEmail(bucket.username) || aliases.has(bucket.username)) {
+    if (isHiddenLeaderboardUsername(bucket.username) || aliases.has(bucket.username)) {
       return { username: publicUsername, time: bucket.time };
     }
-    if (looksLikeEmail(bucket.username)) return null;
+    if (isHiddenLeaderboardUsername(bucket.username)) return null;
     return bucket;
   };
 
@@ -166,7 +275,7 @@ const consolidateLeaderboardIdentity = (data, emailAliases, publicUsername) => {
     (list || []).forEach((entry) => {
       if (entry?.username && aliases.has(entry.username)) {
         best = Math.max(best, Number(entry.points) || 0);
-      } else if (entry?.username && !looksLikeEmail(entry.username)) {
+      } else if (entry?.username && !isHiddenLeaderboardUsername(entry.username)) {
         others.push(entry);
       }
     });
@@ -221,7 +330,7 @@ const buildFastestTimesRows = (surahTimes, sequence = [], quran = null) => {
       !best ||
       typeof best.time !== 'number' ||
       !best.username ||
-      looksLikeEmail(best.username)
+      isHiddenLeaderboardUsername(best.username)
     ) {
       continue;
     }
@@ -257,7 +366,7 @@ const mergeLeaderboards = (localData, serverData, emailAliases = [], publicUsern
   const mergeCountLists = (a, b) => {
     const map = new Map();
     [...(a || []), ...(b || [])].forEach((entry) => {
-      if (!entry?.username || looksLikeEmail(entry.username)) return;
+      if (!entry?.username || isHiddenLeaderboardUsername(entry.username)) return;
       const prev = map.get(entry.username);
       const count = Number(entry.count) || 0;
       if (!prev || count > prev.count) {
@@ -275,17 +384,17 @@ const mergeLeaderboards = (localData, serverData, emailAliases = [], publicUsern
       const serverBest = getBestSurahTimeEntry(b?.[surah]);
       if (Array.isArray(a?.[surah]) && a[surah].length > 0) {
         const list = a[surah]
-          .filter((e) => e?.username && !looksLikeEmail(e.username))
+          .filter((e) => e?.username && !isHiddenLeaderboardUsername(e.username))
           .map((e) => ({ ...e }));
-        if (serverBest && !looksLikeEmail(serverBest.username)) {
+        if (serverBest && !isHiddenLeaderboardUsername(serverBest.username)) {
           const idx = list.findIndex((e) => e.username === serverBest.username);
           if (idx === -1) list.push(serverBest);
           else if (serverBest.time < list[idx].time) list[idx] = serverBest;
         }
         out[surah] = list.sort((x, y) => x.time - y.time);
       } else if (localBest && serverBest) {
-        const left = looksLikeEmail(localBest.username) ? null : localBest;
-        const right = looksLikeEmail(serverBest.username) ? null : serverBest;
+        const left = isHiddenLeaderboardUsername(localBest.username) ? null : localBest;
+        const right = isHiddenLeaderboardUsername(serverBest.username) ? null : serverBest;
         if (left && right) {
           out[surah] = left.time <= right.time ? left : right;
         } else {
@@ -293,7 +402,7 @@ const mergeLeaderboards = (localData, serverData, emailAliases = [], publicUsern
         }
       } else {
         const only = localBest || serverBest;
-        if (only && !looksLikeEmail(only.username)) out[surah] = only;
+        if (only && !isHiddenLeaderboardUsername(only.username)) out[surah] = only;
       }
     });
     return out;
@@ -302,7 +411,7 @@ const mergeLeaderboards = (localData, serverData, emailAliases = [], publicUsern
   const mergePointsLists = (a, b) => {
     const map = new Map();
     [...(a || []), ...(b || [])].forEach((entry) => {
-      if (!entry?.username || looksLikeEmail(entry.username)) return;
+      if (!entry?.username || isHiddenLeaderboardUsername(entry.username)) return;
       const prev = map.get(entry.username);
       const points = Number(entry.points) || 0;
       if (!prev || points > prev.points) {
@@ -419,7 +528,12 @@ const App = () => {
     const storedLeaderboards = localStorage.getItem('hifzDeckLeaderboards');
     if (storedLeaderboards) {
       try {
-        setLeaderboardData(normalizeLeaderboards(JSON.parse(storedLeaderboards)));
+        // Scrub tutorial placeholders like YOUR_EMAIL_HERE left in local caches
+        const cleaned = scrubHiddenLeaderboardUsernames(
+          normalizeLeaderboards(JSON.parse(storedLeaderboards))
+        );
+        setLeaderboardData(cleaned);
+        localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(cleaned));
       } catch {
         setLeaderboardData(EMPTY_LEADERBOARDS);
         localStorage.setItem('hifzDeckLeaderboards', JSON.stringify(EMPTY_LEADERBOARDS));
@@ -475,7 +589,7 @@ const App = () => {
         const rawUsername = data?.username || null;
         const name = displayNameForUser(rawUsername, user);
         setProfileUsername(name);
-        setUsernameDraft(rawUsername && !looksLikeEmail(rawUsername) ? rawUsername : '');
+        setUsernameDraft(rawUsername && !isHiddenLeaderboardUsername(rawUsername) ? rawUsername : '');
         setNeedsUsernameSetup(needsPublicUsername(rawUsername));
 
         if (data?.current_streak != null) {
@@ -2262,10 +2376,10 @@ const App = () => {
                       <Tbody>
                         {Array.isArray(leaderboardData.totalCorrectSurahs) &&
                         leaderboardData.totalCorrectSurahs.filter(
-                          (e) => e?.username && !looksLikeEmail(e.username)
+                          (e) => e?.username && !isHiddenLeaderboardUsername(e.username)
                         ).length > 0 ? (
                           leaderboardData.totalCorrectSurahs
-                            .filter((e) => e?.username && !looksLikeEmail(e.username))
+                            .filter((e) => e?.username && !isHiddenLeaderboardUsername(e.username))
                             .map((entry, index) => (
                             <Tr key={index}>
                               <Td>{index + 1}</Td>
@@ -2335,10 +2449,10 @@ const App = () => {
                       <Tbody>
                         {Array.isArray(leaderboardData.overallPoints) &&
                         leaderboardData.overallPoints.filter(
-                          (e) => e?.username && !looksLikeEmail(e.username)
+                          (e) => e?.username && !isHiddenLeaderboardUsername(e.username)
                         ).length > 0 ? (
                           leaderboardData.overallPoints
-                            .filter((e) => e?.username && !looksLikeEmail(e.username))
+                            .filter((e) => e?.username && !isHiddenLeaderboardUsername(e.username))
                             .map((entry, index) => (
                               <Tr key={index}>
                                 <Td>{index + 1}</Td>
