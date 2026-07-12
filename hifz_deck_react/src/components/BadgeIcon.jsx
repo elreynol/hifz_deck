@@ -9,12 +9,12 @@ const popIn = keyframes`
   to { opacity: 1; transform: scale(1); }
 `;
 
-/** Soft gold rim + quiet inner mist ring (Ink Path shell). */
-const EARNED_RIM = 'rgba(212, 192, 138, 0.55)';
-const LOCKED_FILL = '#6a7471';
+/** Bright white rim for a sticker-like seal (kid-friendly). */
+const EARNED_RIM = 'rgba(255, 255, 255, 0.85)';
+const LOCKED_FILL = '#A0AEC0';
 
 /**
- * Shared circular badge shell with Ink Path center marks.
+ * Shared circular badge shell with playful center marks.
  * Locked badges render as muted silhouettes.
  */
 const BadgeIcon = ({ badgeId, earned = false, size = 48, animate = false }) => {
@@ -25,7 +25,7 @@ const BadgeIcon = ({ badgeId, earned = false, size = 48, animate = false }) => {
     ? `${badge.title} — ${badge.description}`
     : `Locked: ${badge.title} — ${badge.description}`;
 
-  const markSize = size * 0.58;
+  const markSize = size * 0.62;
 
   return (
     <Tooltip label={label} hasArrow placement="top" openDelay={200}>
@@ -41,19 +41,19 @@ const BadgeIcon = ({ badgeId, earned = false, size = 48, animate = false }) => {
         alignItems="center"
         justifyContent="center"
         bg={earned ? badge.color : LOCKED_FILL}
-        color={earned ? 'white' : 'whiteAlpha.700'}
-        border="2px solid"
-        borderColor={earned ? EARNED_RIM : 'whiteAlpha.300'}
+        color={earned ? 'white' : 'whiteAlpha.800'}
+        border="3px solid"
+        borderColor={earned ? EARNED_RIM : 'whiteAlpha.400'}
         boxShadow={
           earned
-            ? 'inset 0 0 0 1.5px rgba(232, 238, 236, 0.28), 0 4px 14px rgba(26, 61, 56, 0.2)'
+            ? `inset 0 0 0 2px rgba(255,255,255,0.22), 0 6px 16px ${badge.color}55`
             : 'none'
         }
-        opacity={earned ? 1 : 0.45}
+        opacity={earned ? 1 : 0.4}
         filter={earned ? 'none' : 'grayscale(1)'}
         animation={animate ? `${popIn} 0.45s ease-out` : undefined}
         transition="transform 0.2s ease"
-        _hover={{ transform: 'scale(1.06)' }}
+        _hover={{ transform: 'scale(1.08)' }}
         cursor="default"
       >
         <svg
