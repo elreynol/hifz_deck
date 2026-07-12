@@ -76,13 +76,19 @@ Deno.serve(async (req) => {
   let newUsername: string;
   try {
     const body = await req.json();
-    newUsername = body.new_username;
-    if (!newUsername || typeof newUsername !== 'string' || newUsername.trim().length < 3) {
+    // Accept both keys so older/newer clients work
+    const raw = body.new_username ?? body.username;
+    newUsername = typeof raw === 'string' ? raw.trim() : '';
+    if (!newUsername || newUsername.length < 3) {
       return new Response(JSON.stringify({ error: 'New username is required and must be at least 3 characters long.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    newUsername = newUsername.trim();
+    if (newUsername.includes('@')) {
+      return new Response(JSON.stringify({ error: 'Username cannot look like an email address.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   } catch (error) {
     console.error("[update-username] Error parsing request body:", error);
     return new Response(JSON.stringify({ error: 'Invalid request body. Please send JSON with new_username.' }), {

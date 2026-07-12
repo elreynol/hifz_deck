@@ -138,11 +138,24 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('update-username', {
-        body: { username },
+        // Edge Function expects `new_username` (not `username`)
+        body: { new_username: username },
       });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (error) {
+        // Surface the function's JSON error when available
+        let message = error.message || 'Failed to update username.';
+        try {
+          const body = typeof error.context?.json === 'function'
+            ? await error.context.json()
+            : null;
+          if (body?.error) message = body.error;
+        } catch {
+          /* ignore parse failures */
+        }
+        throw new Error(message);
+      }
+      if (data?.error) throw new Error(data.error);
 
       setLoading(false);
       return { data, error: null };
