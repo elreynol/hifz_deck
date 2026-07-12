@@ -21,6 +21,16 @@ import { computePoints } from './utils/scoring';
 import { buildChoicePool, shuffleArray } from './utils/buildChoicePool';
 import { BADGE_BY_ID } from './badges/badgeCatalog';
 import { evaluateNewBadges, advanceStreak } from './badges/evaluateBadges';
+import {
+  getHizbsForJuz,
+  getSurahsInHizb,
+  getPrimarySurahForHizb,
+  getPlaySegment,
+  getFirstHizbForJuz,
+  surahInHizb,
+  snapToSurah,
+  getVersesInJuz,
+} from './quran/quranHelpers';
 
 // السابقون unlock thresholds
 const REVERSE_UNLOCK_COUNT = 10; // forward completions to unlock reverse
@@ -275,7 +285,7 @@ const fadeRise = keyframes`
 `;
 
 const App = () => {
-  const { sequence, isLoading, error } = useSequence();
+  const { quran, sequence, isLoading, error } = useSequence();
   const { 
     user, 
     session, 
@@ -284,6 +294,9 @@ const App = () => {
     initialLoading: authInitialLoading, 
     loading: authLoading 
   } = useAuth();
+  // Navigation: Juz' → Hizb → Surah (play unit = surah ∩ hizb)
+  const [selectedJuz, setSelectedJuz] = useState(30); // default Juz Amma
+  const [selectedHizb, setSelectedHizb] = useState(null);
   const [selectedSurah, setSelectedSurah] = useState(null);
   const [cards, setCards] = useState([]);
   const { colorMode, toggleColorMode } = useColorMode();
@@ -459,47 +472,89 @@ const App = () => {
     }
   }, [user, isAuthModalOpen, onAuthModalClose]);
 
-  console.log('App render state:', { sequence, isLoading, error, selectedSurah, cardsLength: cards.length });
+  console.log('App render state:', {
+    isLoading,
+    selectedJuz,
+    selectedHizb,
+    selectedSurah,
+    cardsLength: cards.length,
+  });
 
+  // Initialize Juz → Hizb → Surah cascade once Quran data is ready
   useEffect(() => {
-    console.log('Initial surah effect:', { isLoading, sequenceLength: sequence.length, selectedSurah });
-    if (!isLoading && sequence.length > 0 && !selectedSurah) {
-      console.log('Setting initial surah to:', sequence[0].number);
-      setSelectedSurah(sequence[0].number.toString()); // Ensure string for Select value
-    }
-  }, [isLoading, sequence, selectedSurah]);
+    if (isLoading || !quran) return;
+    if (selectedHizb != null && selectedSurah != null) return;
 
+    const juz = selectedJuz || 30;
+    const hizb = getFirstHizbForJuz(quran, juz);
+    const surah = getPrimarySurahForHizb(quran, hizb);
+    setSelectedJuz(juz);
+    setSelectedHizb(hizb);
+    if (surah) setSelectedSurah(String(surah));
+  }, [isLoading, quran, selectedJuz, selectedHizb, selectedSurah]);
+
+  // Prepare cards from surah ∩ hizb segment
   useEffect(() => {
-    // This effect now only prepares cards when a surah is selected,
-    // but doesn't start the game or timer.
-    console.log('Cards effect (surah change):', { isLoading, selectedSurah, sequenceLength: sequence.length });
-    if (!isLoading && selectedSurah && sequence.length > 0) {
-      const surah = sequence.find(s => s.number.toString() === selectedSurah);
-      console.log('Found surah for card prep:', surah);
-      if (surah) {
-        const newCards = surah.ayat.map((ayah, idx) => ({
-          id: idx + 1,
-          text: ayah,
-          verse: idx + 1,
-          position: null,
-          isFaceDown: true
-        }));
-        // Cards are prepared but not shuffled until game start
-        setCards(newCards);
-        // Reset game state when surah changes
-        setGameStarted(false);
-        setTimerActive(false);
-        setTime(0);
-        setNextExpectedVerse(1);
-        setFailCount(0);
-        setFeedbackCardId(null);
-        setFeedbackStatus('idle');
-        setChoiceCards([]);
-        if (timerRef.current) clearInterval(timerRef.current);
-        if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-      }
+    if (isLoading || !quran || !selectedSurah || !selectedHizb) return;
+
+    const segment = getPlaySegment(quran, Number(selectedSurah), Number(selectedHizb));
+    if (!segment.length) {
+      setCards([]);
+      return;
     }
-  }, [selectedSurah, sequence, isLoading]);
+
+    const newCards = segment.map((ayah, idx) => ({
+      id: idx + 1,
+      text: ayah.text,
+      verse: ayah.verse,
+      position: null,
+      isFaceDown: true,
+    }));
+    setCards(newCards);
+    setGameStarted(false);
+    setTimerActive(false);
+    setTime(0);
+    setNextExpectedVerse(newCards[0]?.verse || 1);
+    setFailCount(0);
+    setFeedbackCardId(null);
+    setFeedbackStatus('idle');
+    setChoiceCards([]);
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+  }, [selectedSurah, selectedHizb, quran, isLoading]);
+
+  const handleJuzChange = (event) => {
+    const juz = Number(event.target.value);
+    if (!quran || Number.isNaN(juz)) return;
+    const hizb = getFirstHizbForJuz(quran, juz);
+    const surah = getPrimarySurahForHizb(quran, hizb);
+    setSelectedJuz(juz);
+    setSelectedHizb(hizb);
+    if (surah) setSelectedSurah(String(surah));
+  };
+
+  const handleHizbChange = (event) => {
+    const hizb = Number(event.target.value);
+    if (!quran || Number.isNaN(hizb)) return;
+    const surah = getPrimarySurahForHizb(quran, hizb);
+    setSelectedHizb(hizb);
+    // Keep juz in sync with this hizb
+    const juz = quran.hizbs?.[String(hizb)]?.juz;
+    if (juz) setSelectedJuz(juz);
+    if (surah) setSelectedSurah(String(surah));
+  };
+
+  const handleSurahChange = (event) => {
+    const surah = event.target.value;
+    setSelectedSurah(surah);
+    if (!quran || !surah) return;
+    if (selectedHizb && surahInHizb(quran, surah, selectedHizb)) return;
+    const snapped = snapToSurah(quran, surah, selectedJuz);
+    if (snapped) {
+      setSelectedJuz(snapped.juz);
+      setSelectedHizb(snapped.hizb);
+    }
+  };
 
   // Timer effect
   useEffect(() => {
@@ -541,17 +596,21 @@ const App = () => {
   const reverseUnlocked = !!user && forwardCount >= REVERSE_UNLOCK_COUNT;
   const isElite = !!user && reverseCount >= ELITE_UNLOCK_COUNT;
 
-  // Unique forward surahs this user has a time for (Juz Amma progress)
+  // Unique forward surahs this user has completed (for Juz Amma / progress)
   const uniqueForwardSurahs = user
-    ? Object.entries(leaderboardData.surahTimes || {}).filter(([, entry]) => {
-        const best = getBestSurahTimeEntry(entry);
-        return (
-          best &&
-          (best.username === boardName ||
-            best.username === profileUsername ||
-            best.username === user.email)
-        );
-      }).length
+    ? new Set(
+        Object.entries(leaderboardData.surahTimes || {})
+          .filter(([, entry]) => {
+            const best = getBestSurahTimeEntry(entry);
+            return (
+              best &&
+              (best.username === boardName ||
+                best.username === profileUsername ||
+                best.username === user.email)
+            );
+          })
+          .map(([key]) => String(key).split('@')[0])
+      ).size
     : 0;
 
   const formatTime = (seconds) => {
@@ -560,15 +619,41 @@ const App = () => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const refillChoices = (allCards, expectedVerse) =>
-    buildChoicePool({
+  const refillChoices = (allCards, expectedVerse) => {
+    const segmentVerses = new Set(allCards.map((c) => c.verse));
+    const juzVerses = getVersesInJuz(quran, selectedJuz, {
+      excludeKeys: new Set(
+        allCards.map((c) => `${Number(selectedSurah)}:${c.verse}`)
+      ),
+    }).filter((v) => {
+      // Prefer other surahs in the juz; still allow other ayahs outside this segment
+      if (v.surah === Number(selectedSurah) && segmentVerses.has(v.ayah)) return false;
+      return true;
+    });
+
+    return buildChoicePool({
       allCards,
       expectedVerse,
       visibleCardCount,
       difficulty,
-      sequence,
-      selectedSurah,
+      juzVerses,
     });
+  };
+
+  // Starting verse for the current play direction within the segment
+  const getStartVerse = (cardList) => {
+    if (!cardList?.length) return 1;
+    const verses = cardList.map((c) => c.verse).sort((a, b) => a - b);
+    return playDirection === 'reverse' ? verses[verses.length - 1] : verses[0];
+  };
+
+  // Next verse after a correct tap (along the segment order)
+  const getAdvancedVerse = (current, cardList = cards) => {
+    const verses = cardList.map((c) => c.verse).sort((a, b) => a - b);
+    const idx = verses.indexOf(current);
+    if (idx === -1) return current;
+    return playDirection === 'reverse' ? verses[idx - 1] : verses[idx + 1];
+  };
 
   // Flash correct/incorrect feedback on a card, then clear it
   const flashFeedback = (cardId, status, durationMs = 500) => {
@@ -581,14 +666,6 @@ const App = () => {
     }, durationMs);
   };
 
-  // Starting verse for the current play direction
-  const getStartVerse = (cardCount) =>
-    playDirection === 'reverse' ? cardCount : 1;
-
-  // Next verse after a correct tap
-  const getAdvancedVerse = (current) =>
-    playDirection === 'reverse' ? current - 1 : current + 1;
-
   // Full sequence restart after 3 strikes
   const handleStrikeReset = () => {
     const resetCards = shuffleArray(
@@ -598,7 +675,7 @@ const App = () => {
         isFaceDown: false,
       }))
     );
-    const startVerse = getStartVerse(resetCards.length);
+    const startVerse = getStartVerse(resetCards);
     setCards(resetCards);
     setChoiceCards(refillChoices(resetCards, startVerse));
     setNextExpectedVerse(startVerse);
@@ -666,14 +743,15 @@ const App = () => {
           position: 'top',
         });
         if (user && selectedSurah) {
+          const boardKey = `${selectedSurah}@h${selectedHizb}`;
           if (playDirection === 'reverse') {
-            updateReverseLeaderboards(selectedSurah, elapsedSeconds, pointsEarned);
+            updateReverseLeaderboards(boardKey, elapsedSeconds, pointsEarned);
           } else {
-            updateLeaderboards(selectedSurah, elapsedSeconds, pointsEarned);
+            updateLeaderboards(boardKey, elapsedSeconds, pointsEarned);
           }
         }
       } else {
-        const newExpected = getAdvancedVerse(nextExpectedVerse);
+        const newExpected = getAdvancedVerse(nextExpectedVerse, updatedCards);
         setNextExpectedVerse(newExpected);
         setChoiceCards(refillChoices(updatedCards, newExpected));
       }
@@ -690,10 +768,21 @@ const App = () => {
   };
 
   const handleStartGame = () => {
-    if (!selectedSurah) {
+    if (!selectedSurah || !selectedHizb) {
       toast({
-        title: 'Select a Surah',
-        description: 'Please select a surah before starting.',
+        title: 'Select a section',
+        description: 'Please select a juz\', hizb, and surah before starting.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+        position: 'top',
+      });
+      return;
+    }
+    if (!cards.length) {
+      toast({
+        title: 'Empty section',
+        description: 'No ayahs found for this surah in the selected hizb.',
         status: 'warning',
         duration: 3000,
         isClosable: true,
@@ -711,18 +800,12 @@ const App = () => {
     const startedCards = shuffleArray(
       cards.map((card) => ({ ...card, position: null, isFaceDown: false }))
     );
-    const startVerse = direction === 'reverse' ? startedCards.length : 1;
+    const startVerse = (() => {
+      const verses = startedCards.map((c) => c.verse).sort((a, b) => a - b);
+      return direction === 'reverse' ? verses[verses.length - 1] : verses[0];
+    })();
     setCards(startedCards);
-    setChoiceCards(
-      buildChoicePool({
-        allCards: startedCards,
-        expectedVerse: startVerse,
-        visibleCardCount,
-        difficulty,
-        sequence,
-        selectedSurah,
-      })
-    );
+    setChoiceCards(refillChoices(startedCards, startVerse));
     setGameStarted(true);
     setNextExpectedVerse(startVerse);
     setFailCount(0);
@@ -744,23 +827,23 @@ const App = () => {
   };
 
   const handleReset = () => {
-    if (selectedSurah) {
-      const surah = sequence.find((s) => s.number.toString() === selectedSurah);
-      if (surah) {
-        const newCards = surah.ayat.map((ayah, idx) => ({
-          id: idx + 1,
-          text: ayah,
-          verse: idx + 1,
-          position: null,
-          isFaceDown: true,
-        }));
-        setCards(newCards);
-      }
+    if (quran && selectedSurah && selectedHizb) {
+      const segment = getPlaySegment(quran, Number(selectedSurah), Number(selectedHizb));
+      const newCards = segment.map((ayah, idx) => ({
+        id: idx + 1,
+        text: ayah.text,
+        verse: ayah.verse,
+        position: null,
+        isFaceDown: true,
+      }));
+      setCards(newCards);
+      setNextExpectedVerse(newCards[0]?.verse || 1);
+    } else {
+      setNextExpectedVerse(1);
     }
     setGameStarted(false);
     setTimerActive(false);
     setTime(0);
-    setNextExpectedVerse(1);
     setFailCount(0);
     setFeedbackCardId(null);
     setFeedbackStatus('idle');
@@ -940,7 +1023,8 @@ const App = () => {
 
     setTimeout(() => {
       if (personalBestAchieved) {
-        const surahName = sequence.find(s => s.number.toString() === surahNumber)?.name || 'this Surah';
+        const surahIdOnly = String(surahNumber).split('@')[0];
+        const surahName = sequence.find(s => s.number.toString() === surahIdOnly)?.name || 'this Surah';
         toast({
           title: 'Personal Best!',
           description: `New speed record for ${surahName}! Time: ${formatTime(timeTaken)}`,
@@ -1049,8 +1133,9 @@ const App = () => {
 
     setTimeout(() => {
       if (personalBestAchieved) {
+        const surahIdOnly = String(surahNumber).split('@')[0];
         const surahName =
-          sequence.find((s) => s.number.toString() === surahNumber)?.name || 'this Surah';
+          sequence.find((s) => s.number.toString() === surahIdOnly)?.name || 'this Surah';
         toast({
           title: 'السابقون Personal Best!',
           description: `New reverse speed record for ${surahName}! Time: ${formatTime(timeTaken)}`,
@@ -1071,10 +1156,6 @@ const App = () => {
         });
       }
     }, 600);
-  };
-
-  const handleSurahChange = (event) => {
-    setSelectedSurah(event.target.value);
   };
 
   const handleModalSignup = async () => {
@@ -1156,6 +1237,10 @@ const App = () => {
     const durationNum = Math.max(1, Math.round(Number(timeTaken) || 0));
     if (isNaN(surahIdNum) || surahIdNum <= 0) return;
 
+    const ayahNums = cards.map((c) => c.verse).sort((a, b) => a - b);
+    const ayahStart = ayahNums[0] || 1;
+    const ayahEnd = ayahNums[ayahNums.length - 1] || ayahStart;
+
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -1174,6 +1259,10 @@ const App = () => {
           difficulty,
           play_direction: playDirection,
           stopwatch_enabled: stopwatchEnabled,
+          juz: selectedJuz,
+          hizb: selectedHizb,
+          ayah_start: ayahStart,
+          ayah_end: ayahEnd,
           badge_ids: extras.badgeIds || [],
           current_streak: extras.streak?.currentStreak ?? currentStreak,
           last_play_date: extras.streak?.lastPlayDate ?? lastPlayDate,
@@ -1417,7 +1506,7 @@ const App = () => {
                 maxW="28rem"
                 display={{ base: gameStarted ? 'none' : 'block', md: 'block' }}
               >
-                Memorize Juz Amma by tapping ayahs in order.
+                Memorize by juz' and hizb — tap ayahs in order.
               </Text>
               {user && (
                 <HStack spacing={1} display={{ base: 'flex', md: 'none' }} flexWrap="wrap" pt={1}>
@@ -1534,27 +1623,73 @@ const App = () => {
                 direction={{ base: 'column', md: 'row' }}
                 alignItems={{ base: 'stretch', md: 'center' }}
                 justify="center"
-                gap={{ base: 2.5, md: 4 }}
+                gap={{ base: 2.5, md: 3 }}
                 flexWrap="wrap"
               >
-                <HStack alignItems="center" spacing={2} flex={{ base: '1', md: 'initial' }} w="100%">
+                <HStack alignItems="center" spacing={2} flex={{ base: '1', md: 'initial' }}>
+                  <Text whiteSpace="nowrap" fontSize="sm" fontWeight="600" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
+                    Juz'
+                  </Text>
+                  <Select
+                    size={{ base: 'sm', md: 'md' }}
+                    maxWidth={{ base: '100%', md: '110px' }}
+                    value={selectedJuz ?? ''}
+                    onChange={handleJuzChange}
+                    isDisabled={gameStarted || isLoading || !quran}
+                    bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
+                    borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
+                  >
+                    {Array.from({ length: 30 }, (_, i) => i + 1).map((j) => (
+                      <option key={j} value={j}>
+                        {j}
+                      </option>
+                    ))}
+                  </Select>
+                </HStack>
+
+                <HStack alignItems="center" spacing={2} flex={{ base: '1', md: 'initial' }}>
+                  <Text whiteSpace="nowrap" fontSize="sm" fontWeight="600" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
+                    Hizb
+                  </Text>
+                  <Select
+                    size={{ base: 'sm', md: 'md' }}
+                    maxWidth={{ base: '100%', md: '110px' }}
+                    value={selectedHizb ?? ''}
+                    onChange={handleHizbChange}
+                    isDisabled={gameStarted || isLoading || !quran}
+                    bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
+                    borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
+                  >
+                    {(quran ? getHizbsForJuz(quran, selectedJuz) : []).map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </Select>
+                </HStack>
+
+                <HStack alignItems="center" spacing={2} flex={{ base: '1', md: 'initial' }} w={{ base: '100%', md: 'auto' }}>
                   <Text whiteSpace="nowrap" fontSize="sm" fontWeight="600" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
                     Surah
                   </Text>
                   <Select
                     size={{ base: 'sm', md: 'md' }}
-                    maxWidth={{ base: '100%', md: '350px' }}
+                    maxWidth={{ base: '100%', md: '280px' }}
                     value={selectedSurah || ''}
                     onChange={handleSurahChange}
                     placeholder="Select a Surah"
-                    isDisabled={gameStarted || isLoading}
+                    isDisabled={gameStarted || isLoading || !selectedHizb}
                     bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
                     borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
                     _hover={{ borderColor: 'ink.400' }}
                   >
-                    {sequence.map((surah) => (
+                    {(quran && selectedHizb
+                      ? getSurahsInHizb(quran, selectedHizb)
+                      : []
+                    ).map((surah) => (
                       <option key={surah.number} value={surah.number.toString()}>
                         {surah.number}. {surah.name}
+                        {surah.from !== surah.to ? ` (${surah.from}–${surah.to})` : ''}
                       </option>
                     ))}
                   </Select>
@@ -1598,8 +1733,8 @@ const App = () => {
                     </HStack>
                     <Text fontSize="xs" mt={1.5} textAlign="center" color={colorMode === 'dark' ? 'whiteAlpha.600' : 'mist.500'}>
                       {difficulty === 'beginner'
-                        ? 'Choices from this surah only'
-                        : 'Wrong choices can be from other Juz Amma surahs'}
+                        ? 'Choices from this section only'
+                        : 'Wrong choices mix this section and other ayahs in this juz\''}
                     </Text>
                   </FormControl>
 
@@ -1732,8 +1867,8 @@ const App = () => {
               )}
               <Text fontSize={{ base: 'sm', md: 'md' }} color={colorMode === 'dark' ? 'mist.200' : 'mist.600'}>
                 {playDirection === 'reverse'
-                  ? `Next: ayah ${nextExpectedVerse} → 1`
-                  : `Next: ayah ${nextExpectedVerse} of ${cards.length}`}
+                  ? `Next: ayah ${nextExpectedVerse} → start`
+                  : `Next: ayah ${nextExpectedVerse} (${cards.filter((c) => c.position !== null).length + 1}/${cards.length})`}
               </Text>
               {playDirection === 'reverse' && (
                 <Text fontSize="sm" color="elite.500" fontFamily="arabic">

@@ -10,51 +10,52 @@ export function useSequence() {
   return context
 }
 
+/**
+ * Loads full Quran offline JSON (built from api.quran.com / QUL-compatible Imlaei).
+ * Exposes quran data + a legacy `sequence` list of surahs for compatibility.
+ */
 export function SequenceProvider({ children }) {
+  const [quran, setQuran] = useState(null)
   const [sequence, setSequence] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    const loadSurahs = async () => {
-      console.log('Starting to load surahs...')
+    const load = async () => {
       try {
-        const response = await fetch('juz_amma_surahs.json')
-        console.log('Fetch response:', response.status, response.statusText)
-        
+        const response = await fetch('quran_data.json')
         if (!response.ok) {
-          throw new Error(`Failed to load surahs: ${response.statusText}`)
+          throw new Error(`Failed to load Quran data: ${response.statusText}`)
         }
-        
         const data = await response.json()
-        console.log('Loaded data:', data)
-        
-        const formattedSequence = Object.entries(data).map(([number, surah]) => ({
-          number: parseInt(number),
-          name: surah.name,
-          ayat: surah.ayat
-        })).sort((a, b) => a.number - b.number)
-        
-        console.log('Formatted sequence:', formattedSequence)
-        setSequence(formattedSequence)
+        const surahList = Object.values(data.surahs || {})
+          .map((s) => ({
+            number: s.number,
+            name: s.name,
+            nameSimple: s.nameSimple,
+            ayat: s.ayat,
+            versesCount: s.versesCount,
+          }))
+          .sort((a, b) => a.number - b.number)
+
+        setQuran(data)
+        setSequence(surahList)
         setIsLoading(false)
       } catch (err) {
-        console.error('Error in loadSurahs:', err)
+        console.error('Error loading Quran data:', err)
         setError(err.message)
         setIsLoading(false)
       }
     }
-
-    loadSurahs()
+    load()
   }, [])
 
-  console.log('SequenceContext state:', { sequence, isLoading, error })
-
   const value = {
+    quran,
     sequence,
     setSequence,
     isLoading,
-    error
+    error,
   }
 
   return (
@@ -62,4 +63,4 @@ export function SequenceProvider({ children }) {
       {children}
     </SequenceContext.Provider>
   )
-} 
+}

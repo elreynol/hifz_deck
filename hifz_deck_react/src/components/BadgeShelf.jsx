@@ -52,7 +52,7 @@ const BadgeShelf = ({
             </Text>
           )}
           <Text fontSize="xs" color={isDark ? 'whiteAlpha.600' : 'mist.500'}>
-            Juz Amma {uniqueForwardSurahs}/{JUZ_AMMA_SURAH_COUNT}
+            Surahs {uniqueForwardSurahs}/{JUZ_AMMA_SURAH_COUNT}
           </Text>
         </HStack>
       </Flex>
