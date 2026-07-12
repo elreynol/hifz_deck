@@ -46,15 +46,16 @@ const PointsWeightingExplainer = ({
     stopwatchEnabled,
   });
 
-  const muted = isDark ? 'whiteAlpha.600' : 'gray.500';
-  const ink = isDark ? 'whiteAlpha.900' : 'gray.800';
-  const softBg = isDark ? 'whiteAlpha.100' : 'blackAlpha.50';
-  const border = isDark ? 'whiteAlpha.200' : 'gray.200';
+  const muted = isDark ? 'whiteAlpha.600' : 'mist.500';
+  const ink = isDark ? 'mist.50' : 'ink.800';
+  const softBg = isDark ? 'blackAlpha.300' : 'mist.100';
+  const border = isDark ? 'whiteAlpha.200' : 'mist.200';
+
 
   const MultRow = ({ label, value, active }) => (
     <Flex justify="space-between" gap={3} fontSize="sm">
       <Text color={muted}>{label}</Text>
-      <Text fontWeight={active ? '700' : '500'} color={active ? (isDark ? 'elite.200' : 'teal.700') : ink}>
+      <Text fontWeight={active ? '700' : '500'} color={active ? (isDark ? 'elite.200' : 'ink.600') : ink}>
         ×{value}
       </Text>
     </Flex>
@@ -156,7 +157,7 @@ const PointsWeightingExplainer = ({
                 {playDirection}
               </Text>
             </HStack>
-            <Text mt={2} fontSize="md" fontWeight="700" color={isDark ? 'elite.200' : 'teal.700'}>
+            <Text mt={2} fontSize="md" fontWeight="700" color={isDark ? 'elite.200' : 'ink.600'}>
               ≈ {examplePoints} points
             </Text>
           </Box>

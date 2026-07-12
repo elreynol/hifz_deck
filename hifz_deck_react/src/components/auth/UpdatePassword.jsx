@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Button,
@@ -8,37 +8,45 @@ import {
   VStack,
   useToast,
   Heading,
-  Text
+  Text,
+  useColorMode,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
+import AppBackground from '../AppBackground';
 
+/**
+ * Standalone page for password-reset links.
+ * Matches the ink/mist soft-panel look used in account modals.
+ */
 export default function UpdatePassword() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const toast = useToast();
   const navigate = useNavigate();
+  const { colorMode } = useColorMode();
+  const isDark = colorMode === 'dark';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error: updateError } = await supabase.auth.updateUser({ password });
 
-    if (error) {
-      setError(error.message);
+    if (updateError) {
+      setError(updateError.message);
       toast({
-        title: 'Error updating password',
-        description: error.message,
+        title: 'Could not update password',
+        description: updateError.message,
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
     } else {
       toast({
-        title: 'Password updated successfully!',
+        title: 'Password updated',
         description: 'You can now log in with your new password.',
         status: 'success',
         duration: 5000,
@@ -50,29 +58,72 @@ export default function UpdatePassword() {
   };
 
   return (
-    <Box p={8} maxWidth="500px" borderWidth={1} borderRadius={8} boxShadow="lg" mx="auto" mt={20}>
-      <VStack spacing={4}>
-        <Heading>Update Your Password</Heading>
-        <Text>Enter a new password below.</Text>
-        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-          <VStack spacing={4}>
-            <FormControl isRequired>
-              <FormLabel>New Password</FormLabel>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your new password"
-                isDisabled={loading}
-              />
-            </FormControl>
-            <Button type="submit" colorScheme="blue" width="full" isLoading={loading}>
-              Update Password
-            </Button>
-            {error && <Text color="red.500">{error}</Text>}
-          </VStack>
-        </form>
-      </VStack>
+    <Box minHeight="100vh" position="relative" display="flex" alignItems="center" justifyContent="center" px={4}>
+      <AppBackground />
+      <Box
+        position="relative"
+        zIndex={1}
+        w="100%"
+        maxW="420px"
+        p={{ base: 5, md: 8 }}
+        borderRadius="xl"
+        border="1px solid"
+        borderColor={isDark ? 'whiteAlpha.200' : 'mist.200'}
+        bg={isDark ? 'ink.800' : 'mist.50'}
+        boxShadow="panel"
+      >
+        <VStack spacing={4} align="stretch">
+          <Heading
+            as="h1"
+            size="lg"
+            fontFamily="heading"
+            color={isDark ? 'mist.50' : 'ink.900'}
+          >
+            Update your password
+          </Heading>
+          <Text fontSize="sm" color={isDark ? 'whiteAlpha.600' : 'mist.500'}>
+            Enter a new password below, then return to Hifzer to sign in.
+          </Text>
+          <form onSubmit={handleSubmit}>
+            <VStack spacing={4} align="stretch">
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" color={isDark ? 'mist.100' : 'ink.700'} mb={1}>
+                  New password
+                </FormLabel>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  isDisabled={loading}
+                  bg={isDark ? 'blackAlpha.300' : 'white'}
+                  borderColor={isDark ? 'whiteAlpha.300' : 'mist.300'}
+                  _hover={{ borderColor: isDark ? 'whiteAlpha.400' : 'ink.300' }}
+                  _focusVisible={{
+                    borderColor: 'ink.400',
+                    boxShadow: '0 0 0 1px var(--chakra-colors-ink-400)',
+                  }}
+                />
+              </FormControl>
+              <Button
+                type="submit"
+                bg="ink.600"
+                color="white"
+                _hover={{ bg: 'ink.700' }}
+                width="full"
+                isLoading={loading}
+              >
+                Save password
+              </Button>
+              {error && (
+                <Text color="red.400" fontSize="sm">
+                  {error}
+                </Text>
+              )}
+            </VStack>
+          </form>
+        </VStack>
+      </Box>
     </Box>
   );
-} 
+}
