@@ -6,11 +6,25 @@ import {
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
+import BadgeShelf from './BadgeShelf';
 
 const REVERSE_UNLOCK_COUNT = 10;
 const ELITE_UNLOCK_COUNT = 3;
 
-const AccountSettings = ({ isOpen, onClose, forwardCount = 0, reverseCount = 0, isElite = false }) => {
+const AccountSettings = ({
+  isOpen,
+  onClose,
+  forwardCount = 0,
+  reverseCount = 0,
+  isElite = false,
+  earnedBadgeIds = [],
+  currentStreak = 0,
+  completedSurahs = 0,
+  completedJuzs = 0,
+  selectedJuz = 30,
+  juzSectionsDone = 0,
+  juzSectionsTotal = 0,
+}) => {
   const { user, session, updateUsername, updateUserPassword } = useAuth();
   const toast = useToast();
 
@@ -215,6 +229,18 @@ const AccountSettings = ({ isOpen, onClose, forwardCount = 0, reverseCount = 0, 
               </TabPanel>
               <TabPanel>
                 <Heading size="md" mb={4}>My Hifz Progress</Heading>
+
+                <Box mb={6}>
+                  <BadgeShelf
+                    earnedIds={earnedBadgeIds}
+                    currentStreak={currentStreak}
+                    completedSurahs={completedSurahs}
+                    completedJuzs={completedJuzs}
+                    selectedJuz={selectedJuz}
+                    juzSectionsDone={juzSectionsDone}
+                    juzSectionsTotal={juzSectionsTotal}
+                  />
+                </Box>
 
                 {isElite && (
                   <Box
