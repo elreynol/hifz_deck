@@ -29,6 +29,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import BadgeShelf from './BadgeShelf';
+import { Link as RouterLink } from 'react-router-dom';
+import { isLinkableUsername } from './LeaderboardUsernameLink';
 
 const REVERSE_UNLOCK_COUNT = 10;
 const ELITE_UNLOCK_COUNT = 3;
@@ -256,6 +258,19 @@ const AccountSettings = ({
                     <Text fontSize="sm" color={headingColor} fontWeight="600">
                       {currentProfileUsername}
                     </Text>
+                    {isLinkableUsername(currentProfileUsername) && (
+                      <Button
+                        as={RouterLink}
+                        to={`/profile/${encodeURIComponent(currentProfileUsername)}`}
+                        onClick={onClose}
+                        size="xs"
+                        mt={2}
+                        variant="outline"
+                        colorScheme="teal"
+                      >
+                        View public profile
+                      </Button>
+                    )}
                   </Box>
 
                   <Box pt={3} borderTopWidth="1px" borderColor={borderSoft}>
