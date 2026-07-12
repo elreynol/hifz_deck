@@ -4,7 +4,7 @@ import {
   useColorMode, Select, Modal, ModalOverlay, ModalContent, ModalHeader, 
   ModalFooter, ModalBody, ModalCloseButton, FormControl, FormLabel, Input, useDisclosure,
   Table, Thead, Tbody, Tr, Th, Td, TableContainer, Tabs, TabList, Tab, TabPanels, TabPanel,
-  Checkbox, Radio, RadioGroup, Stack, SimpleGrid, Flex, Badge
+  Checkbox, Radio, RadioGroup, Stack, SimpleGrid, Flex, Badge, Image, Divider
 } from '@chakra-ui/react';
 import { keyframes } from '@emotion/react';
 import { MoonIcon, SunIcon, ArrowRightIcon, RepeatIcon, StarIcon } from '@chakra-ui/icons';
@@ -1511,9 +1511,18 @@ const App = () => {
     return (
       <Box minHeight="100vh" display="flex" alignItems="center" justifyContent="center" position="relative">
         <AppBackground />
-        <Text position="relative" zIndex={1} fontFamily="heading" color="ink.700">
-          Loading Hifzer...
-        </Text>
+        <VStack position="relative" zIndex={1} spacing={3}>
+          <Image
+            src="/hifz_deck/brand/hifzer-app-icon.png"
+            alt=""
+            boxSize={{ base: '56px', md: '72px' }}
+            borderRadius="xl"
+            boxShadow="soft"
+          />
+          <Text fontFamily="heading" color={colorMode === 'dark' ? 'mist.100' : 'ink.700'} fontSize="lg">
+            Loading Hifzer...
+          </Text>
+        </VStack>
       </Box>
     );
   }
@@ -1556,12 +1565,20 @@ const App = () => {
                 align="center"
                 gap={2}
               >
-                <HStack spacing={2} align="center" flexWrap="wrap">
+                <HStack spacing={2.5} align="center" flexWrap="wrap">
+                  <Image
+                    src="/hifz_deck/brand/hifzer-app-icon.png"
+                    alt=""
+                    boxSize={{ base: '36px', md: '48px' }}
+                    borderRadius="lg"
+                    flexShrink={0}
+                  />
                   <Heading
                     as="h1"
                     size={{ base: 'md', md: '2xl' }}
                     color={colorMode === 'dark' ? 'mist.50' : 'ink.900'}
                     lineHeight="1.15"
+                    letterSpacing="-0.02em"
                   >
                     Hifzer
                   </Heading>
@@ -2095,45 +2112,78 @@ const App = () => {
       />
 
       <Modal isOpen={isAuthModalOpen} onClose={() => { onAuthModalClose(); setEmailInput(''); setPasswordInput(''); setUsernameInput(''); }} isCentered>
-        <ModalOverlay />
-        <ModalContent bg={colorMode === 'dark' ? 'gray.700' : 'white'}>
-          <ModalHeader>{isSigningUp ? 'Sign Up' : 'Login'}</ModalHeader>
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(6px)" />
+        <ModalContent
+          bg={colorMode === 'dark' ? 'ink.800' : 'mist.50'}
+          border="1px solid"
+          borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}
+          mx={4}
+          overflow="hidden"
+        >
+          <ModalHeader pb={2}>
+            <HStack spacing={3}>
+              <Image
+                src="/hifz_deck/brand/hifzer-app-icon.png"
+                alt=""
+                boxSize="36px"
+                borderRadius="md"
+              />
+              <Box>
+                <Text fontFamily="heading" fontSize="lg" color={colorMode === 'dark' ? 'mist.50' : 'ink.900'}>
+                  {isSigningUp ? 'Create your account' : 'Welcome back'}
+                </Text>
+                <Text fontSize="xs" color={colorMode === 'dark' ? 'whiteAlpha.600' : 'mist.500'} fontWeight="400">
+                  Hifzer
+                </Text>
+              </Box>
+            </HStack>
+          </ModalHeader>
           <ModalCloseButton />
-          <ModalBody pb={6}>
+          <ModalBody pb={4}>
             {isSigningUp ? (
               <VStack spacing={4} align="stretch">
                 <GoogleSignInButton label="Sign up with Google" />
-                <Text fontSize="xs" color="gray.500" textAlign="center">
-                  Or create an account with email
-                </Text>
+                <Flex align="center" gap={3}>
+                  <Divider borderColor={colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.200'} />
+                  <Text fontSize="xs" color={colorMode === 'dark' ? 'whiteAlpha.600' : 'mist.500'} whiteSpace="nowrap">
+                    or email
+                  </Text>
+                  <Divider borderColor={colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.200'} />
+                </Flex>
                 <FormControl isRequired>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel fontSize="sm">Email</FormLabel>
                   <Input
                     placeholder="Enter your email"
                     type="email"
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                     isDisabled={authLoading}
+                    bg={colorMode === 'dark' ? 'blackAlpha.300' : 'white'}
+                    borderColor={colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
                   />
                 </FormControl>
                 <FormControl isRequired>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel fontSize="sm">Password</FormLabel>
                   <Input
                     placeholder="Create a password"
                     type="password"
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
                     isDisabled={authLoading}
+                    bg={colorMode === 'dark' ? 'blackAlpha.300' : 'white'}
+                    borderColor={colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
                   />
                 </FormControl>
                 <FormControl isRequired>
-                  <FormLabel>Username</FormLabel>
+                  <FormLabel fontSize="sm">Username</FormLabel>
                   <Input
                     placeholder="Choose a username (min 3 chars)"
                     type="text"
                     value={usernameInput}
                     onChange={(e) => setUsernameInput(e.target.value)}
                     isDisabled={authLoading}
+                    bg={colorMode === 'dark' ? 'blackAlpha.300' : 'white'}
+                    borderColor={colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
                   />
                 </FormControl>
               </VStack>
@@ -2142,47 +2192,71 @@ const App = () => {
             )}
           </ModalBody>
 
-          <ModalFooter>
-            {isSigningUp ? (
-              <Button colorScheme="blue" mr={3} onClick={handleModalSignup} isLoading={authLoading}>
-                Sign Up
+          <ModalFooter pt={0} flexDirection="column" alignItems="stretch" gap={2}>
+            {isSigningUp && (
+              <Button
+                bg="ink.600"
+                color="white"
+                _hover={{ bg: 'ink.700' }}
+                onClick={handleModalSignup}
+                isLoading={authLoading}
+                h="44px"
+              >
+                Sign up
               </Button>
-            ) : (
-              null 
             )}
-            <Button onClick={() => {
-              setIsSigningUp(!isSigningUp);
-              setEmailInput(''); 
-              setPasswordInput('');
-              setUsernameInput('');
-            }} variant="ghost" isLoading={authLoading}>
-              {isSigningUp ? 'Already have an account? Login' : 'Need an account? Sign Up'}
+            <Button
+              onClick={() => {
+                setIsSigningUp(!isSigningUp);
+                setEmailInput('');
+                setPasswordInput('');
+                setUsernameInput('');
+              }}
+              variant="ghost"
+              size="sm"
+              color={colorMode === 'dark' ? 'whiteAlpha.700' : 'mist.600'}
+              isLoading={authLoading}
+            >
+              {isSigningUp ? 'Already have an account? Log in' : 'Need an account? Sign up'}
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       <Modal isOpen={isLeaderboardModalOpen} onClose={onLeaderboardModalClose} size="xl" isCentered>
-        <ModalOverlay />
-        <ModalContent bg={colorMode === 'dark' ? 'gray.700' : 'white'}>
-          <ModalHeader>Leaderboard</ModalHeader>
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(6px)" />
+        <ModalContent
+          bg={colorMode === 'dark' ? 'ink.800' : 'mist.50'}
+          border="1px solid"
+          borderColor={colorMode === 'dark' ? 'whiteAlpha.200' : 'mist.200'}
+          mx={3}
+        >
+          <ModalHeader fontFamily="heading" color={colorMode === 'dark' ? 'mist.50' : 'ink.900'}>
+            Leaderboard
+          </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Tabs isFitted variant="enclosed">
-              <TabList>
-                <Tab fontSize={{ base: 'xs', md: 'sm' }}>Correct Surahs</Tab>
-                <Tab fontSize={{ base: 'xs', md: 'sm' }}>Fastest Times</Tab>
-                <Tab fontSize={{ base: 'xs', md: 'sm' }}>Overall Points</Tab>
+            <Tabs isFitted variant="soft-rounded" colorScheme="teal" size="sm">
+              <TabList
+                mb={3}
+                gap={1}
+                bg={colorMode === 'dark' ? 'blackAlpha.300' : 'mist.100'}
+                p={1}
+                borderRadius="lg"
+              >
+                <Tab fontSize={{ base: 'xs', md: 'sm' }} borderRadius="md">Sections</Tab>
+                <Tab fontSize={{ base: 'xs', md: 'sm' }} borderRadius="md">Fastest</Tab>
+                <Tab fontSize={{ base: 'xs', md: 'sm' }} borderRadius="md">Points</Tab>
               </TabList>
               <TabPanels>
-                <TabPanel>
+                <TabPanel px={0}>
                   <TableContainer>
-                    <Table variant="simple">
+                    <Table variant="simple" size="sm">
                       <Thead>
                         <Tr>
                           <Th>Rank</Th>
                           <Th>Username</Th>
-                          <Th>Correct Surahs</Th>
+                          <Th isNumeric>Cleared</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
@@ -2195,28 +2269,28 @@ const App = () => {
                             .map((entry, index) => (
                             <Tr key={index}>
                               <Td>{index + 1}</Td>
-                              <Td>{entry.username || 'Anonymous'}</Td>
-                              <Td>{entry.count}</Td>
+                              <Td fontWeight={index < 3 ? '600' : '400'}>{entry.username || 'Anonymous'}</Td>
+                              <Td isNumeric>{entry.count}</Td>
                             </Tr>
                           ))
                         ) : (
-                          <Tr><Td colSpan="3">No data available.</Td></Tr>
+                          <Tr><Td colSpan="3" color="gray.500">No data yet — finish a section to appear here.</Td></Tr>
                         )}
                       </Tbody>
                     </Table>
                   </TableContainer>
                 </TabPanel>
-                <TabPanel>
-                <Text fontSize="xs" mb={3} color="gray.500">
-                  Times are not weighted by difficulty.
+                <TabPanel px={0}>
+                <Text fontSize="xs" mb={3} color={colorMode === 'dark' ? 'whiteAlpha.600' : 'mist.500'}>
+                  Raw times — not weighted by difficulty.
                 </Text>
                 <TableContainer>
-                  <Table variant="simple">
+                  <Table variant="simple" size="sm">
                     <Thead>
                       <Tr>
                         <Th>Surah</Th>
                         <Th>Username</Th>
-                        <Th>Time (seconds)</Th>
+                        <Th isNumeric>Seconds</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -2229,7 +2303,7 @@ const App = () => {
                         if (rows.length === 0) {
                           return (
                             <Tr>
-                              <Td colSpan="3">No data available.</Td>
+                              <Td colSpan="3" color="gray.500">No times recorded yet.</Td>
                             </Tr>
                           );
                         }
@@ -2237,7 +2311,7 @@ const App = () => {
                           <Tr key={row.surahId}>
                             <Td>{row.name}</Td>
                             <Td>{row.username || 'Anonymous'}</Td>
-                            <Td>{row.time}</Td>
+                            <Td isNumeric>{row.time}</Td>
                           </Tr>
                         ));
                       })()}
@@ -2245,17 +2319,17 @@ const App = () => {
                   </Table>
                 </TableContainer>
                 </TabPanel>
-                <TabPanel>
-                  <Text fontSize="xs" mb={3} color="gray.500">
+                <TabPanel px={0}>
+                  <Text fontSize="xs" mb={3} color={colorMode === 'dark' ? 'whiteAlpha.600' : 'mist.500'}>
                     Weighted by level, choices shown, and direction.
                   </Text>
                   <TableContainer>
-                    <Table variant="simple">
+                    <Table variant="simple" size="sm">
                       <Thead>
                         <Tr>
                           <Th>Rank</Th>
                           <Th>Username</Th>
-                          <Th>Points</Th>
+                          <Th isNumeric>Points</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
@@ -2268,12 +2342,12 @@ const App = () => {
                             .map((entry, index) => (
                               <Tr key={index}>
                                 <Td>{index + 1}</Td>
-                                <Td>{entry.username || 'Anonymous'}</Td>
-                                <Td>{entry.points}</Td>
+                                <Td fontWeight={index < 3 ? '600' : '400'}>{entry.username || 'Anonymous'}</Td>
+                                <Td isNumeric>{entry.points}</Td>
                               </Tr>
                             ))
                         ) : (
-                          <Tr><Td colSpan="3">No data available.</Td></Tr>
+                          <Tr><Td colSpan="3" color="gray.500">No points yet.</Td></Tr>
                         )}
                       </Tbody>
                     </Table>
@@ -2289,7 +2363,14 @@ const App = () => {
             />
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={handleSyncLeaderboard}>
+            <Button
+              bg="ink.600"
+              color="white"
+              mr={3}
+              _hover={{ bg: 'ink.700' }}
+              onClick={handleSyncLeaderboard}
+              isLoading={isLeaderboardLoading}
+            >
               Sync with Server
             </Button>
             <Button variant="ghost" onClick={onLeaderboardModalClose}>Close</Button>

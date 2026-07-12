@@ -1,11 +1,13 @@
 import React from 'react';
-import { Button, useToast } from '@chakra-ui/react';
+import { Button, useColorMode, useToast } from '@chakra-ui/react';
 import { useAuth } from '../../context/AuthContext';
 
 /** Shared Google OAuth button for login and signup screens. */
 export default function GoogleSignInButton({ label = 'Continue with Google' }) {
   const { signInWithGoogle, loading: authLoading } = useAuth();
+  const { colorMode } = useColorMode();
   const toast = useToast();
+  const isDark = colorMode === 'dark';
 
   const handleClick = async () => {
     const { error } = await signInWithGoogle();
@@ -25,10 +27,23 @@ export default function GoogleSignInButton({ label = 'Continue with Google' }) {
   return (
     <Button
       type="button"
-      variant="outline"
       width="full"
+      h="48px"
       onClick={handleClick}
       isLoading={authLoading}
+      bg={isDark ? 'whiteAlpha.100' : 'white'}
+      color={isDark ? 'mist.50' : 'ink.800'}
+      border="1px solid"
+      borderColor={isDark ? 'whiteAlpha.300' : 'mist.300'}
+      boxShadow="soft"
+      fontWeight="600"
+      _hover={{
+        bg: isDark ? 'whiteAlpha.200' : 'mist.50',
+        borderColor: isDark ? 'whiteAlpha.400' : 'ink.300',
+        transform: 'translateY(-1px)',
+      }}
+      _active={{ transform: 'translateY(0)' }}
+      transition="all 0.15s ease"
       leftIcon={
         <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
           <path

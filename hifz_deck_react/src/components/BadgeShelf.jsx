@@ -93,10 +93,10 @@ const BadgeShelf = ({
         value={juzPercent}
         size="xs"
         borderRadius="full"
-        colorScheme="gray"
+        colorScheme="teal"
         mb={3}
         bg={isDark ? 'whiteAlpha.100' : 'mist.100'}
-        opacity={0.85}
+        opacity={0.55}
         aria-label={`Juz ${selectedJuz} sections ${juzSectionsDone} of ${juzSectionsTotal}`}
       />
 
