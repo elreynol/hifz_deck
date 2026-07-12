@@ -59,6 +59,16 @@ export default function UsernameSetupModal({
       });
       return;
     }
+    if (/^YOUR_[A-Z0-9_]+$/i.test(trimmed) || /^<.*>$/.test(trimmed)) {
+      toast({
+        title: 'Choose a real username',
+        description: 'That looks like a placeholder — pick a name you want on the leaderboard.',
+        status: 'warning',
+        duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
 
     const { error } = await updateUsername(trimmed);
     if (error) {
@@ -146,5 +156,8 @@ export function needsPublicUsername(username) {
   const trimmed = username.trim();
   if (trimmed.length < 3) return true;
   if (trimmed.includes('@')) return true;
+  // Reject tutorial placeholders like YOUR_EMAIL_HERE
+  if (/^YOUR_[A-Z0-9_]+$/i.test(trimmed)) return true;
+  if (/^<.*>$/.test(trimmed)) return true;
   return false;
 }
