@@ -1512,7 +1512,7 @@ const App = () => {
       <Box minHeight="100vh" display="flex" alignItems="center" justifyContent="center" position="relative">
         <AppBackground />
         <Text position="relative" zIndex={1} fontFamily="heading" color="ink.700">
-          Loading Hifz Deck...
+          Loading Hifzer...
         </Text>
       </Box>
     );
@@ -1563,7 +1563,7 @@ const App = () => {
                     color={colorMode === 'dark' ? 'mist.50' : 'ink.900'}
                     lineHeight="1.15"
                   >
-                    Hifz Deck
+                    Hifzer
                   </Heading>
                   {isElite && (
                     <Badge
