@@ -19,6 +19,8 @@ export const isLinkableUsername = (value) => {
   const trimmed = value.trim();
   if (!trimmed || trimmed === 'Anonymous') return false;
   if (looksLikeEmail(trimmed) || isPlaceholderUsername(trimmed)) return false;
+  // Guest names are local-only — linking them from another browser would 404
+  if (/^Guest_/i.test(trimmed)) return false;
   return true;
 };
 

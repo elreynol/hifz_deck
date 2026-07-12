@@ -4,6 +4,37 @@ import { authRedirectToHome, authRedirectToUpdatePassword } from '../utils/authR
 
 const AuthContext = createContext();
 
+/** localStorage key for temporary guest play (not a real account) */
+export const GUEST_STORAGE_KEY = 'hifzDeckGuest';
+
+/** True when this "user" is a local guest, not a Supabase account */
+export const isGuestUser = (user) => !!(user && user.isGuest);
+
+/** Build a short temporary name like Guest_7K2Q */
+const makeGuestUsername = () => {
+  const code = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `Guest_${code}`;
+};
+
+const readStoredGuest = () => {
+  try {
+    const raw = localStorage.getItem(GUEST_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.id || !parsed?.username) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const guestUserFromStored = (stored) => ({
+  id: stored.id,
+  isGuest: true,
+  email: null,
+  user_metadata: { username: stored.username },
+});
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
@@ -13,18 +44,36 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     setInitialLoading(true);
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
+      if (currentSession?.user) {
+        // Real account wins — drop any leftover guest stub
+        localStorage.removeItem(GUEST_STORAGE_KEY);
+        setSession(currentSession);
+        setUser(currentSession.user);
+      } else {
+        setSession(null);
+        const stored = readStoredGuest();
+        setUser(stored ? guestUserFromStored(stored) : null);
+      }
       setInitialLoading(false);
     }).catch((error) => {
       console.error('[AuthProvider] Error in getSession():', error);
+      const stored = readStoredGuest();
+      setUser(stored ? guestUserFromStored(stored) : null);
       setInitialLoading(false);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
+        if (newSession?.user) {
+          localStorage.removeItem(GUEST_STORAGE_KEY);
+          setSession(newSession);
+          setUser(newSession.user);
+        } else {
+          setSession(null);
+          // Keep guest if present (sign-out of a real account, or token refresh with no session)
+          const stored = readStoredGuest();
+          setUser(stored ? guestUserFromStored(stored) : null);
+        }
         setInitialLoading(false);
         setLoading(false);
       }
@@ -37,6 +86,31 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
+  /**
+   * Play without an account. Progress stays in this browser only
+   * under a temporary Guest_XXXX name.
+   */
+  const signInAsGuest = () => {
+    setLoading(true);
+    try {
+      const username = makeGuestUsername();
+      const id =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? `guest-${crypto.randomUUID()}`
+          : `guest-${Date.now()}`;
+      const stored = { id, username, createdAt: new Date().toISOString() };
+      localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(stored));
+      setSession(null);
+      setUser(guestUserFromStored(stored));
+      setLoading(false);
+      return { data: { user: guestUserFromStored(stored) }, error: null };
+    } catch (error) {
+      console.error('[AuthProvider] signInAsGuest error:', error);
+      setLoading(false);
+      return { data: null, error };
+    }
+  };
+
   const signUp = async (email, password, username) => {
     setLoading(true);
     try {
@@ -48,6 +122,7 @@ export const AuthProvider = ({ children }) => {
       if (invokeData.error) throw invokeData.error;
 
       if (invokeData.session && invokeData.user) {
+        localStorage.removeItem(GUEST_STORAGE_KEY);
         const { error: setError } = await supabase.auth.setSession(invokeData.session);
         if (setError) {
           console.error('[AuthProvider] Error in signUp while calling setSession:', setError);
@@ -74,6 +149,7 @@ export const AuthProvider = ({ children }) => {
       if (invokeData.error) throw invokeData.error;
 
       if (invokeData.session && invokeData.user) {
+        localStorage.removeItem(GUEST_STORAGE_KEY);
         const { error: setError } = await supabase.auth.setSession(invokeData.session);
         if (setError) {
           console.error('[AuthProvider] Error in login while calling setSession:', setError);
@@ -96,6 +172,7 @@ export const AuthProvider = ({ children }) => {
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
+      // Real OAuth will replace guest after redirect
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -138,12 +215,10 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('update-username', {
-        // Edge Function expects `new_username` (not `username`)
         body: { new_username: username },
       });
 
       if (error) {
-        // Surface the function's JSON error when available
         let message = error.message || 'Failed to update username.';
         try {
           const body = typeof error.context?.json === 'function'
@@ -186,9 +261,16 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('[AuthProvider] Error logging out:', error);
+    // End guest session (local only)
+    localStorage.removeItem(GUEST_STORAGE_KEY);
+    if (session) {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('[AuthProvider] Error logging out:', error);
+      }
+    } else {
+      setUser(null);
+      setSession(null);
     }
     setLoading(false);
   };
@@ -196,6 +278,8 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     session,
+    isGuest: isGuestUser(user),
+    signInAsGuest,
     signUp,
     login,
     signInWithGoogle,
