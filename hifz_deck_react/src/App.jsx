@@ -749,7 +749,9 @@ const App = () => {
     if (selectedHizb != null && selectedSurah != null) return;
 
     const juz = selectedJuz || 30;
-    const hizb = getFirstHizbForJuz(quran, juz);
+    // Special case: For Juz 30 (Juz Amma), start with hizb 60 (contains Surah 114)
+    // This aligns with the pedagogical approach of starting from the end
+    const hizb = juz === 30 ? 60 : getFirstHizbForJuz(quran, juz);
     const surah = getPrimarySurahForHizb(quran, hizb);
     setSelectedJuz(juz);
     setSelectedHizb(hizb);

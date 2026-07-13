@@ -122,13 +122,7 @@ async function main() {
 
   const juzs = {};
   for (let j = 1; j <= 30; j++) {
-    let hz = [...(juzHizbs[j] || [])].sort((a, b) => a - b);
-    // Special case: For Juz 30 (Juz Amma), reverse the hizb order
-    // so that hizb 60 (containing Surah 114) comes first
-    // This aligns with the common pedagogical approach of starting from the end
-    if (j === 30) {
-      hz = hz.reverse();
-    }
+    const hz = [...(juzHizbs[j] || [])].sort((a, b) => a - b);
     juzs[String(j)] = {
       number: j,
       hizbs: hz.length ? hz : [j * 2 - 1, j * 2],
