@@ -534,6 +534,7 @@ const App = () => {
   const [selectedJuz, setSelectedJuz] = useState(30); // default Juz Amma
   const [selectedHizb, setSelectedHizb] = useState(null);
   const [selectedSurah, setSelectedSurah] = useState(null);
+  const [surahSelectionMode, setSurahSelectionMode] = useState('byHizb'); // 'byHizb' or 'allSurahs'
   const [cards, setCards] = useState([]);
   const { colorMode, toggleColorMode } = useColorMode();
   const toast = useToast();
@@ -2073,32 +2074,52 @@ const App = () => {
                   </Select>
                 </HStack>
 
-                <HStack alignItems="center" spacing={2} flex={{ base: '1', md: 'initial' }} w={{ base: '100%', md: 'auto' }}>
-                  <Text whiteSpace="nowrap" fontSize="sm" fontWeight="600" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
-                    Surah
-                  </Text>
+                <VStack alignItems="stretch" spacing={2} flex={{ base: '1', md: 'initial' }} w={{ base: '100%', md: 'auto' }}>
+                  <HStack alignItems="center" spacing={2}>
+                    <Text whiteSpace="nowrap" fontSize="sm" fontWeight="600" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
+                      Surah
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => setSurahSelectionMode(surahSelectionMode === 'byHizb' ? 'allSurahs' : 'byHizb')}
+                      isDisabled={gameStarted || isLoading}
+                      fontSize="xs"
+                      color={colorMode === 'dark' ? 'teal.300' : 'teal.600'}
+                      _hover={{ bg: colorMode === 'dark' ? 'whiteAlpha.100' : 'blackAlpha.50' }}
+                    >
+                      {surahSelectionMode === 'byHizb' ? 'Show All' : 'By Hizb'}
+                    </Button>
+                  </HStack>
                   <Select
                     size={{ base: 'sm', md: 'md' }}
                     maxWidth={{ base: '100%', md: '280px' }}
                     value={selectedSurah || ''}
                     onChange={handleSurahChange}
-                    placeholder="Select a Surah"
-                    isDisabled={gameStarted || isLoading || !selectedHizb}
+                    placeholder={surahSelectionMode === 'allSurahs' ? 'Select any Surah' : 'Select a Surah'}
+                    isDisabled={gameStarted || isLoading || (surahSelectionMode === 'byHizb' && !selectedHizb)}
                     bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
                     borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
                     _hover={{ borderColor: 'ink.400' }}
                   >
-                    {(quran && selectedHizb
-                      ? getSurahsInHizb(quran, selectedHizb)
-                      : []
-                    ).map((surah) => (
-                      <option key={surah.number} value={surah.number.toString()}>
-                        {surah.number}. {surah.name}
-                        {surah.from !== surah.to ? ` (${surah.from}–${surah.to})` : ''}
-                      </option>
-                    ))}
+                    {surahSelectionMode === 'allSurahs'
+                      ? (quran ? Object.values(quran.surahs).map((surah) => (
+                          <option key={surah.number} value={surah.number.toString()}>
+                            {surah.number}. {surah.name} — {surah.nameSimple}
+                          </option>
+                        )) : [])
+                      : (quran && selectedHizb
+                          ? getSurahsInHizb(quran, selectedHizb)
+                          : []
+                        ).map((surah) => (
+                          <option key={surah.number} value={surah.number.toString()}>
+                            {surah.number}. {surah.name}
+                            {surah.from !== surah.to ? ` (${surah.from}–${surah.to})` : ''}
+                          </option>
+                        ))
+                    }
                   </Select>
-                </HStack>
+                </VStack>
 
                 <Checkbox
                   isChecked={stopwatchEnabled}
