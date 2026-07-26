@@ -111,6 +111,11 @@ async function main() {
         primary = r.surah;
       }
     }
+    // Special case: For hizb 60 (Juz Amma), default to Surah 114 (An-Nas)
+    // This is the most common starting point for beginners learning Juz Amma
+    if (hizb === 60) {
+      primary = 114;
+    }
     const juz = verseIndex.find((v) => v.hizb === hizb)?.juz || Math.ceil(hizb / 2);
     hizbs[hizbStr] = { number: hizb, juz, primarySurah: primary, ranges };
   }
