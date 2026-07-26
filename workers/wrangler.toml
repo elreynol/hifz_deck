@@ -1,0 +1,19 @@
+name = "hifz-deck-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "hifz_deck_db"
+database_id = "placeholder" # Will be created with: wrangler d1 create hifz_deck_db
+
+# Environment variables (set with: wrangler secret put <KEY>)
+# JWT_SECRET - for signing/verifying JWT tokens
+# GOOGLE_CLIENT_ID - for Google OAuth
+# GOOGLE_CLIENT_SECRET - for Google OAuth
+
+[build]
+command = "npm run build"
+
+# CORS configuration is handled in the worker code
