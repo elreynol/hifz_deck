@@ -6,7 +6,7 @@ compatibility_date = "2024-01-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "hifz_deck_db"
-database_id = "placeholder" # Will be created with: wrangler d1 create hifz_deck_db
+database_id = "c79f88b8-0673-4eea-8461-67abaf565888"
 
 # Environment variables (set with: wrangler secret put <KEY>)
 # JWT_SECRET - for signing/verifying JWT tokens
