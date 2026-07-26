@@ -19,7 +19,6 @@ import { keyframes } from '@emotion/react';
 import AppBackground from './AppBackground';
 import BadgeShelf from './BadgeShelf';
 import { useAuth, isGuestUser } from '../context/AuthContext';
-import { supabase } from '../supabaseClient';
 import { loadPublicProfile } from '../utils/loadPublicProfile';
 import { loadGuestProfileFromLocal } from '../utils/loadGuestProfileFromLocal';
 import { isLinkableUsername } from './LeaderboardUsernameLink';
