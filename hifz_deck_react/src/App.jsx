@@ -42,6 +42,7 @@ import {
   countFullyCompletedJuzs,
   getJuzSegmentProgress,
   isJuzFullyComplete,
+  listPlaySegments,
 } from './quran/quranHelpers';
 
 // السابقون unlock thresholds
@@ -531,9 +532,10 @@ const App = () => {
     loading: authLoading 
   } = useAuth();
   // Navigation: Juz' → Hizb → Surah (play unit = surah ∩ hizb)
-  const [selectedJuz, setSelectedJuz] = useState(30); // default Juz Amma
-  const [selectedHizb, setSelectedHizb] = useState(null);
-  const [selectedSurah, setSelectedSurah] = useState(null);
+  // Default open: Surah 1 (Al-Fatihah) in Hizb 1 / Juz' 1
+  const [selectedJuz, setSelectedJuz] = useState(1);
+  const [selectedHizb, setSelectedHizb] = useState(1);
+  const [selectedSurah, setSelectedSurah] = useState('1');
   const [cards, setCards] = useState([]);
   const { colorMode, toggleColorMode } = useColorMode();
   const toast = useToast();
@@ -552,7 +554,7 @@ const App = () => {
   const [playDirection, setPlayDirection] = useState('forward');
   // Difficulty + how many choice cards to show
   const [difficulty, setDifficulty] = useState('beginner');
-  const [visibleCardCount, setVisibleCardCount] = useState(5);
+  const [visibleCardCount, setVisibleCardCount] = useState(3);
   const [nextExpectedVerse, setNextExpectedVerse] = useState(1);
   const [failCount, setFailCount] = useState(0);
   // Brief visual feedback on the tapped card
@@ -743,14 +745,18 @@ const App = () => {
     cardsLength: cards.length,
   });
 
-  // Initialize Juz → Hizb → Surah cascade once Quran data is ready
+  // Fallback cascade if selection is cleared — still prefer Surah 1 / Hizb 1
   useEffect(() => {
     if (isLoading || !quran) return;
     if (selectedHizb != null && selectedSurah != null) return;
 
-    const juz = selectedJuz || 30;
-    const hizb = getFirstHizbForJuz(quran, juz);
-    const surah = getPrimarySurahForHizb(quran, hizb);
+    const juz = selectedJuz || 1;
+    const hizb = selectedHizb ?? getFirstHizbForJuz(quran, juz);
+    // Prefer first surah in the hizb (Al-Fatihah for hizb 1), not primarySurah
+    const surah =
+      selectedSurah ||
+      getSurahsInHizb(quran, hizb)[0]?.number ||
+      getPrimarySurahForHizb(quran, hizb);
     setSelectedJuz(juz);
     setSelectedHizb(hizb);
     if (surah) setSelectedSurah(String(surah));
@@ -1163,6 +1169,35 @@ const App = () => {
     setChoiceCards([]);
     if (timerRef.current) clearInterval(timerRef.current);
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+  };
+
+  /** Reset the current section so the user can press Start Game again (timer stays off). */
+  const handlePlayAgain = () => {
+    handleReset();
+  };
+
+  /** Move to the next playable section; user presses Start Game when ready (no auto timer). */
+  const handleNextSurah = () => {
+    if (!quran || !selectedSurah || !selectedHizb) return;
+    const segments = listPlaySegments(quran);
+    const currentIndex = segments.findIndex(
+      (s) => s.surah === Number(selectedSurah) && s.hizb === Number(selectedHizb)
+    );
+    const next = currentIndex >= 0 ? segments[currentIndex + 1] : null;
+    if (!next) {
+      toast({
+        title: 'End of the Quran',
+        description: 'You have completed the last section. Mashallah!',
+        status: 'success',
+        duration: 4000,
+        isClosable: true,
+        position: 'top',
+      });
+      return;
+    }
+    setSelectedJuz(next.juz);
+    setSelectedHizb(next.hizb);
+    setSelectedSurah(String(next.surah));
   };
 
   const applyGamificationRewards = ({
@@ -1785,6 +1820,29 @@ const App = () => {
 
   const unplacedCards = cards.filter(card => !card.position);
   const visibleCards = choiceCards;
+  // Lock juz/hizb/surah only while a round is actively in progress
+  const selectionLocked = gameStarted && unplacedCards.length > 0;
+
+  // Next playable section after the current surah ∩ hizb (for the "Next surah" button)
+  const nextPlaySegment = (() => {
+    if (!quran || !selectedSurah || !selectedHizb) return null;
+    const segments = listPlaySegments(quran);
+    const currentIndex = segments.findIndex(
+      (s) => s.surah === Number(selectedSurah) && s.hizb === Number(selectedHizb)
+    );
+    return currentIndex >= 0 ? segments[currentIndex + 1] || null : null;
+  })();
+  const nextSurahLabel = (() => {
+    if (!nextPlaySegment) return null;
+    const name =
+      quran?.surahs?.[String(nextPlaySegment.surah)]?.nameSimple ||
+      `Surah ${nextPlaySegment.surah}`;
+    // Same surah spanning another hizb → "continue"; otherwise "next surah"
+    if (nextPlaySegment.surah === Number(selectedSurah)) {
+      return `Continue ${name}`;
+    }
+    return `Next: ${name}`;
+  })();
 
   return (
     <Box data-elite={isElite ? 'true' : undefined} minHeight="100vh" position="relative">
@@ -2040,7 +2098,7 @@ const App = () => {
                     maxWidth={{ base: '100%', md: '110px' }}
                     value={selectedJuz ?? ''}
                     onChange={handleJuzChange}
-                    isDisabled={gameStarted || isLoading || !quran}
+                    isDisabled={selectionLocked || isLoading || !quran}
                     bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
                     borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
                   >
@@ -2061,7 +2119,7 @@ const App = () => {
                     maxWidth={{ base: '100%', md: '110px' }}
                     value={selectedHizb ?? ''}
                     onChange={handleHizbChange}
-                    isDisabled={gameStarted || isLoading || !quran}
+                    isDisabled={selectionLocked || isLoading || !quran}
                     bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
                     borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
                   >
@@ -2083,7 +2141,8 @@ const App = () => {
                     value={selectedSurah || ''}
                     onChange={handleSurahChange}
                     placeholder="Select a Surah"
-                    isDisabled={gameStarted || isLoading || !selectedHizb}
+                    isDisabled={selectionLocked || isLoading || !selectedHizb}
+                    dir="ltr"
                     bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
                     borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
                     _hover={{ borderColor: 'ink.400' }}
@@ -2092,9 +2151,12 @@ const App = () => {
                       ? getSurahsInHizb(quran, selectedHizb)
                       : []
                     ).map((surah) => (
-                      <option key={surah.number} value={surah.number.toString()}>
+                      <option key={surah.number} value={surah.number.toString()} dir="ltr">
+                        {/* LRI/PDI keep verse numbers left-to-right next to Arabic names */}
                         {surah.number}. {surah.name}
-                        {surah.from !== surah.to ? ` (${surah.from}–${surah.to})` : ''}
+                        {surah.from !== surah.to
+                          ? `\u2066 (${surah.from}–${surah.to})\u2069`
+                          : ''}
                       </option>
                     ))}
                   </Select>
@@ -2373,15 +2435,55 @@ const App = () => {
                   })}
                 </SimpleGrid>
                 {unplacedCards.length === 0 && (
-                  <Text
-                    textAlign="center"
-                    fontFamily="heading"
-                    color={colorMode === 'dark' ? 'elite.200' : 'ink.600'}
-                    fontWeight="600"
-                    py={{ base: 3, md: 4 }}
-                  >
-                    {playDirection === 'reverse' ? 'السابقون complete' : 'All ayahs completed'}
-                  </Text>
+                  <VStack spacing={3} py={{ base: 3, md: 4 }} w="100%">
+                    <Text
+                      textAlign="center"
+                      fontFamily="heading"
+                      color={colorMode === 'dark' ? 'elite.200' : 'ink.600'}
+                      fontWeight="600"
+                    >
+                      {playDirection === 'reverse' ? 'السابقون complete' : 'All ayahs completed'}
+                    </Text>
+                    <Stack
+                      direction={{ base: 'column', sm: 'row' }}
+                      spacing={3}
+                      justify="center"
+                      align="stretch"
+                      w="100%"
+                      maxW="md"
+                    >
+                      <Button
+                        onClick={handlePlayAgain}
+                        leftIcon={<RepeatIcon />}
+                        variant="outline"
+                        borderColor={colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
+                        color={colorMode === 'dark' ? 'mist.100' : 'ink.700'}
+                        _hover={{
+                          borderColor: 'ink.400',
+                          bg: colorMode === 'dark' ? 'whiteAlpha.100' : 'mist.100',
+                        }}
+                        size={{ base: 'md', md: 'md' }}
+                        w={{ base: '100%', sm: 'auto' }}
+                        flex={{ sm: 1 }}
+                      >
+                        Play again
+                      </Button>
+                      <Button
+                        onClick={handleNextSurah}
+                        leftIcon={<ArrowRightIcon />}
+                        bg={playDirection === 'reverse' ? 'elite.500' : 'ink.600'}
+                        color="white"
+                        _hover={{ bg: playDirection === 'reverse' ? 'elite.600' : 'ink.700' }}
+                        isDisabled={!nextPlaySegment}
+                        size={{ base: 'md', md: 'md' }}
+                        w={{ base: '100%', sm: 'auto' }}
+                        flex={{ sm: 1 }}
+                        px={6}
+                      >
+                        {nextSurahLabel || 'No next surah'}
+                      </Button>
+                    </Stack>
+                  </VStack>
                 )}
               </Box>
             </VStack>
