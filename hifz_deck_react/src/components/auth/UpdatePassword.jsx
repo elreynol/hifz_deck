@@ -12,7 +12,7 @@ import {
   useColorMode,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 import AppBackground from '../AppBackground';
 
 /**
@@ -25,6 +25,7 @@ export default function UpdatePassword() {
   const [error, setError] = useState(null);
   const toast = useToast();
   const navigate = useNavigate();
+  const { updateUserPassword } = useAuth();
   const { colorMode } = useColorMode();
   const isDark = colorMode === 'dark';
 
@@ -33,7 +34,7 @@ export default function UpdatePassword() {
     setLoading(true);
     setError(null);
 
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    const { error: updateError } = await updateUserPassword(password);
 
     if (updateError) {
       setError(updateError.message);

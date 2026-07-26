@@ -22,7 +22,7 @@ import PointsWeightingExplainer from './components/PointsWeightingExplainer';
 import LeaderboardUsernameLink from './components/LeaderboardUsernameLink';
 import { useSequence } from './context/SequenceContext';
 import { useAuth, isGuestUser } from './context/AuthContext';
-import { supabase } from './supabaseClient';
+import { progress as apiProgress, leaderboard as apiLeaderboard } from './apiClient';
 import { Link as RouterLink } from 'react-router-dom';
 import { computePoints } from './utils/scoring';
 import { buildChoicePool, shuffleArray } from './utils/buildChoicePool';
@@ -1493,10 +1493,7 @@ const App = () => {
 
   const handleSyncLeaderboard = async () => {
     try {
-      // Must be GET — the edge function rejects POST with 405
-      const { data, error } = await supabase.functions.invoke('leaderboard', {
-        method: 'GET',
-      });
+      const { data, error } = await apiLeaderboard.get();
       if (error) throw error;
 
       if (data) {
@@ -1535,32 +1532,23 @@ const App = () => {
     const ayahEnd = ayahNums[ayahNums.length - 1] || ayahStart;
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) {
-        console.warn('[progress] No access token; skipping server record');
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('progress', {
-        headers: { Authorization: `Bearer ${token}` },
-        body: {
-          surah_id: surahIdNum,
-          duration_seconds: durationNum,
-          ayah_count: cards.length || 1,
-          card_count: visibleCardCount,
-          difficulty,
-          play_direction: playDirection,
-          stopwatch_enabled: stopwatchEnabled,
-          juz: selectedJuz,
-          hizb: selectedHizb,
-          ayah_start: ayahStart,
-          ayah_end: ayahEnd,
-          badge_ids: extras.badgeIds || [],
-          current_streak: extras.streak?.currentStreak ?? currentStreak,
-          last_play_date: extras.streak?.lastPlayDate ?? lastPlayDate,
-        },
+      const { data, error } = await apiProgress.record({
+        surah_id: surahIdNum,
+        duration_seconds: durationNum,
+        ayah_count: cards.length || 1,
+        card_count: visibleCardCount,
+        difficulty,
+        play_direction: playDirection,
+        stopwatch_enabled: stopwatchEnabled,
+        juz: selectedJuz,
+        hizb: selectedHizb,
+        ayah_start: ayahStart,
+        ayah_end: ayahEnd,
+        badge_ids: extras.badgeIds || [],
+        current_streak: extras.streak?.currentStreak ?? currentStreak,
+        last_play_date: extras.streak?.lastPlayDate ?? lastPlayDate,
       });
+      
       if (error) {
         console.error('Failed to record progress on server:', error);
         toast({
@@ -1670,14 +1658,9 @@ const App = () => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('progress', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: {
-          surah_id: surahIdNum,
-          duration_seconds: durationNum
-        }
+      const { data, error } = await apiProgress.record({
+        surah_id: surahIdNum,
+        duration_seconds: durationNum
       });
 
       if (error) {
@@ -1715,9 +1698,7 @@ const App = () => {
     console.log("[App.jsx] fetchLeaderboard called");
     setIsLeaderboardLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('leaderboard', {
-        method: 'GET',
-      });
+      const { data, error } = await apiLeaderboard.get();
 
       if (error) {
         throw error;

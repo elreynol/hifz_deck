@@ -27,7 +27,6 @@ import {
   useColorMode,
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabaseClient';
 import BadgeShelf from './BadgeShelf';
 import { Link as RouterLink } from 'react-router-dom';
 import { isLinkableUsername } from './LeaderboardUsernameLink';

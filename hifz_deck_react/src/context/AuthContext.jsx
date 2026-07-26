@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { supabase } from '../supabaseClient';
+import { auth as apiAuth, getToken } from '../apiClient';
 import { authRedirectToHome, authRedirectToUpdatePassword } from '../utils/authRedirect';
 
 const AuthContext = createContext();
@@ -43,47 +43,44 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     setInitialLoading(true);
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      if (currentSession?.user) {
-        // Real account wins — drop any leftover guest stub
-        localStorage.removeItem(GUEST_STORAGE_KEY);
-        setSession(currentSession);
-        setUser(currentSession.user);
-      } else {
-        setSession(null);
-        const stored = readStoredGuest();
-        setUser(stored ? guestUserFromStored(stored) : null);
-      }
-      setInitialLoading(false);
-    }).catch((error) => {
-      console.error('[AuthProvider] Error in getSession():', error);
-      const stored = readStoredGuest();
-      setUser(stored ? guestUserFromStored(stored) : null);
-      setInitialLoading(false);
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        if (newSession?.user) {
+    
+    // Check if we have a stored token
+    const token = getToken();
+    
+    if (token) {
+      // Fetch current user profile with token
+      apiAuth.getProfile().then(({ data, error }) => {
+        if (data && !error) {
           localStorage.removeItem(GUEST_STORAGE_KEY);
-          setSession(newSession);
-          setUser(newSession.user);
+          const mockSession = { access_token: token };
+          const mockUser = {
+            id: data.user.id,
+            email: data.user.email,
+            user_metadata: { username: data.profile.username },
+          };
+          setSession(mockSession);
+          setUser(mockUser);
         } else {
+          // Token is invalid, check for guest
+          apiAuth.logout();
           setSession(null);
-          // Keep guest if present (sign-out of a real account, or token refresh with no session)
           const stored = readStoredGuest();
           setUser(stored ? guestUserFromStored(stored) : null);
         }
         setInitialLoading(false);
-        setLoading(false);
-      }
-    );
-
-    return () => {
-      if (authListener?.subscription) {
-        authListener.subscription.unsubscribe();
-      }
-    };
+      }).catch((error) => {
+        console.error('[AuthProvider] Error in getProfile():', error);
+        const stored = readStoredGuest();
+        setUser(stored ? guestUserFromStored(stored) : null);
+        setInitialLoading(false);
+      });
+    } else {
+      // No token, check for guest
+      setSession(null);
+      const stored = readStoredGuest();
+      setUser(stored ? guestUserFromStored(stored) : null);
+      setInitialLoading(false);
+    }
   }, []);
 
   /**
@@ -114,19 +111,21 @@ export const AuthProvider = ({ children }) => {
   const signUp = async (email, password, username) => {
     setLoading(true);
     try {
-      const { data: invokeData, error: functionError } = await supabase.functions.invoke('signup', {
-        body: { email, password, username },
-      });
+      const { data: invokeData, error: functionError } = await apiAuth.signup(email, password, username);
 
       if (functionError) throw functionError;
       if (invokeData.error) throw invokeData.error;
 
       if (invokeData.session && invokeData.user) {
         localStorage.removeItem(GUEST_STORAGE_KEY);
-        const { error: setError } = await supabase.auth.setSession(invokeData.session);
-        if (setError) {
-          console.error('[AuthProvider] Error in signUp while calling setSession:', setError);
-        }
+        const mockSession = { access_token: invokeData.session.access_token };
+        const mockUser = {
+          id: invokeData.user.id,
+          email: invokeData.user.email,
+          user_metadata: { username: invokeData.username },
+        };
+        setSession(mockSession);
+        setUser(mockUser);
       }
 
       setLoading(false);
@@ -141,20 +140,24 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const { data: invokeData, error: functionError } = await supabase.functions.invoke('login', {
-        body: { email, password },
-      });
+      const { data: invokeData, error: functionError } = await apiAuth.login(email, password);
 
       if (functionError) throw functionError;
       if (invokeData.error) throw invokeData.error;
 
       if (invokeData.session && invokeData.user) {
         localStorage.removeItem(GUEST_STORAGE_KEY);
-        const { error: setError } = await supabase.auth.setSession(invokeData.session);
-        if (setError) {
-          console.error('[AuthProvider] Error in login while calling setSession:', setError);
-          throw setError;
-        }
+        
+        // Fetch profile to get username
+        const { data: profileData } = await apiAuth.getProfile();
+        const mockSession = { access_token: invokeData.session.access_token };
+        const mockUser = {
+          id: invokeData.user.id,
+          email: invokeData.user.email,
+          user_metadata: { username: profileData?.profile?.username || invokeData.user.email.split('@')[0] },
+        };
+        setSession(mockSession);
+        setUser(mockUser);
       } else {
         throw new Error('Login succeeded but session data was not returned from function.');
       }
@@ -168,23 +171,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  /** Redirects the browser to Google → Supabase → back to the app home URL */
+  /** Google OAuth - Not yet implemented in Cloudflare Workers */
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
-      // Real OAuth will replace guest after redirect
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: authRedirectToHome(),
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-      if (error) throw error;
-      return { data, error: null };
+      // TODO: Implement Google OAuth flow with Cloudflare Workers
+      console.warn('[AuthProvider] Google OAuth not yet implemented with Cloudflare Workers');
+      setLoading(false);
+      return { data: null, error: new Error('Google OAuth not yet implemented') };
     } catch (error) {
       console.error('[AuthProvider] signInWithGoogle caught error:', error);
       setLoading(false);
@@ -195,12 +189,10 @@ export const AuthProvider = ({ children }) => {
   const updateUserPassword = async (password) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('update-password', {
-        body: { password },
-      });
+      const { data, error } = await apiAuth.updatePassword(password);
 
       if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (data?.error) throw new Error(data.error);
 
       setLoading(false);
       return { data, error: null };
@@ -214,23 +206,20 @@ export const AuthProvider = ({ children }) => {
   const updateUsername = async (username) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('update-username', {
-        body: { new_username: username },
-      });
+      const { data, error } = await apiAuth.updateUsername(username);
 
       if (error) {
-        let message = error.message || 'Failed to update username.';
-        try {
-          const body = typeof error.context?.json === 'function'
-            ? await error.context.json()
-            : null;
-          if (body?.error) message = body.error;
-        } catch {
-          /* ignore parse failures */
-        }
-        throw new Error(message);
+        throw error;
       }
       if (data?.error) throw new Error(data.error);
+
+      // Update local user state with new username
+      if (user && data?.username) {
+        setUser({
+          ...user,
+          user_metadata: { ...user.user_metadata, username: data.username },
+        });
+      }
 
       setLoading(false);
       return { data, error: null };
@@ -244,14 +233,10 @@ export const AuthProvider = ({ children }) => {
   const sendPasswordResetEmail = async (email) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: authRedirectToUpdatePassword(),
-      });
-
-      if (error) throw error;
-
+      // TODO: Implement password reset email functionality
+      console.warn('[AuthProvider] Password reset email not yet implemented with Cloudflare Workers');
       setLoading(false);
-      return { data, error: null };
+      return { data: null, error: new Error('Password reset not yet implemented') };
     } catch (error) {
       console.error('[AuthProvider] sendPasswordResetEmail caught error:', error);
       setLoading(false);
@@ -264,14 +249,10 @@ export const AuthProvider = ({ children }) => {
     // End guest session (local only)
     localStorage.removeItem(GUEST_STORAGE_KEY);
     if (session) {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('[AuthProvider] Error logging out:', error);
-      }
-    } else {
-      setUser(null);
-      setSession(null);
+      apiAuth.logout();
     }
+    setUser(null);
+    setSession(null);
     setLoading(false);
   };
 
