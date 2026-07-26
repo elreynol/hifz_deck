@@ -44,7 +44,7 @@ export async function verifyToken(token: string, secret: string): Promise<JWTPay
 /**
  * Extract token from Authorization header
  */
-export function extractToken(authHeader: string | null): string | null {
+export function extractToken(authHeader: string | null | undefined): string | null {
   if (!authHeader) return null;
   
   const parts = authHeader.split(' ');
