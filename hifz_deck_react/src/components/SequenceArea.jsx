@@ -17,10 +17,10 @@ const SequenceArea = ({ cards, playDirection = 'forward', isElite = false }) => 
 
   return (
     <Box
-      bg={isDark ? 'rgba(34, 66, 63, 0.55)' : 'rgba(255, 255, 255, 0.55)'}
+      bg={isDark ? 'rgba(44, 50, 59, 0.72)' : 'rgba(255, 255, 255, 0.82)'}
       backdropFilter="blur(14px)"
       borderRadius={{ base: 'lg', md: 'xl' }}
-      boxShadow="soft"
+      boxShadow={isDark ? 'panel' : 'panelLight'}
       padding={{ base: '0.75rem', md: '1.5rem' }}
       dir="rtl"
       w="100%"

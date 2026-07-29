@@ -1911,7 +1911,7 @@ const App = () => {
                         size="sm"
                         aria-label="Open Leaderboard"
                         variant="ghost"
-                        colorScheme="teal"
+                        colorScheme="gray"
                       />
                       <Button
                         onClick={() => { setIsSigningUp(false); onAuthModalOpen(); }}
@@ -1928,7 +1928,7 @@ const App = () => {
                     icon={colorMode === 'dark' ? <SunIcon /> : <MoonIcon />}
                     onClick={toggleColorMode}
                     variant="ghost"
-                    colorScheme="teal"
+                    colorScheme="gray"
                     aria-label="Toggle color mode"
                     size="sm"
                   />
@@ -1944,15 +1944,15 @@ const App = () => {
               </Text>
               {user && (
                 <HStack spacing={1} display={{ base: 'flex', md: 'none' }} flexWrap="wrap" pt={1}>
-                  <Button as={RouterLink} to="/profile" size="xs" variant="ghost" colorScheme="teal">
+                  <Button as={RouterLink} to="/profile" size="xs" variant="ghost" colorScheme="gray">
                     Profile
                   </Button>
                   {!isGuest && (
-                    <Button onClick={onAccountSettingsOpen} size="xs" variant="ghost" colorScheme="teal">
+                    <Button onClick={onAccountSettingsOpen} size="xs" variant="ghost" colorScheme="gray">
                       Account
                     </Button>
                   )}
-                  <Button onClick={handleLogout} size="xs" variant="outline" colorScheme="teal" isLoading={authLoading}>
+                  <Button onClick={handleLogout} size="xs" variant="outline" colorScheme="gray" isLoading={authLoading}>
                     {isGuest ? 'End guest' : 'Logout'}
                   </Button>
                   <IconButton
@@ -1961,7 +1961,7 @@ const App = () => {
                     size="xs"
                     aria-label="Open Leaderboard"
                     variant="ghost"
-                    colorScheme="teal"
+                    colorScheme="gray"
                   />
                 </HStack>
               )}
@@ -1977,15 +1977,15 @@ const App = () => {
                       Guest
                     </Badge>
                   )}
-                  <Button as={RouterLink} to="/profile" size="sm" variant="ghost" colorScheme="teal">
+                  <Button as={RouterLink} to="/profile" size="sm" variant="ghost" colorScheme="gray">
                     Profile
                   </Button>
                   {!isGuest && (
-                    <Button onClick={onAccountSettingsOpen} size="sm" variant="ghost" colorScheme="teal">
+                    <Button onClick={onAccountSettingsOpen} size="sm" variant="ghost" colorScheme="gray">
                       Account
                     </Button>
                   )}
-                  <Button onClick={handleLogout} size="sm" variant="outline" colorScheme="teal" isLoading={authLoading}>
+                  <Button onClick={handleLogout} size="sm" variant="outline" colorScheme="gray" isLoading={authLoading}>
                     {isGuest ? 'End guest' : 'Logout'}
                   </Button>
                   <IconButton
@@ -1994,7 +1994,7 @@ const App = () => {
                     size="sm"
                     aria-label="Open Leaderboard"
                     variant="ghost"
-                    colorScheme="teal"
+                    colorScheme="gray"
                   />
                 </>
               ) : (
@@ -2005,7 +2005,7 @@ const App = () => {
                     size="sm"
                     aria-label="Open Leaderboard"
                     variant="ghost"
-                    colorScheme="teal"
+                    colorScheme="gray"
                   />
                   <Button
                     onClick={() => { setIsSigningUp(false); onAuthModalOpen(); }}
@@ -2022,7 +2022,7 @@ const App = () => {
                 icon={colorMode === 'dark' ? <SunIcon /> : <MoonIcon />}
                 onClick={toggleColorMode}
                 variant="ghost"
-                colorScheme="teal"
+                colorScheme="gray"
                 aria-label="Toggle color mode"
               />
             </HStack>
@@ -2032,7 +2032,7 @@ const App = () => {
           {user && !gameStarted && (
             <Box
               w="100%"
-              bg={colorMode === 'dark' ? 'rgba(34, 66, 63, 0.4)' : 'rgba(255, 255, 255, 0.5)'}
+              bg={colorMode === 'dark' ? 'rgba(44, 50, 59, 0.55)' : 'rgba(255, 255, 255, 0.78)'}
               backdropFilter="blur(12px)"
               border="1px solid"
               borderColor={
@@ -2064,7 +2064,7 @@ const App = () => {
           {/* Controls panel — denser on mobile so the game starts higher on screen */}
           <Box
             w="100%"
-            bg={colorMode === 'dark' ? 'rgba(34, 66, 63, 0.55)' : 'rgba(255, 255, 255, 0.62)'}
+            bg={colorMode === 'dark' ? 'rgba(44, 50, 59, 0.72)' : 'rgba(255, 255, 255, 0.82)'}
             backdropFilter="blur(16px)"
             border="1px solid"
             borderColor={
@@ -2077,30 +2077,34 @@ const App = () => {
                   : 'mist.200'
             }
             borderRadius={{ base: 'lg', md: 'xl' }}
-            boxShadow="soft"
+            boxShadow={colorMode === 'dark' ? 'panel' : 'panelLight'}
             px={{ base: 3, md: 6 }}
             py={{ base: 3.5, md: 6 }}
           >
             <VStack spacing={{ base: 3, md: 5 }} w="100%" align="stretch">
               <Flex
-                direction={{ base: 'column', md: 'row' }}
-                alignItems={{ base: 'stretch', md: 'center' }}
+                direction="row"
+                align="flex-end"
                 justify="center"
-                gap={{ base: 2.5, md: 3 }}
+                gap={2}
                 flexWrap="wrap"
+                w="100%"
               >
-                <HStack alignItems="center" spacing={2} flex={{ base: '1', md: 'initial' }}>
-                  <Text whiteSpace="nowrap" fontSize="sm" fontWeight="600" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
+                <Box flexShrink={0}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="600"
+                    mb={1}
+                    color={colorMode === 'dark' ? 'whiteAlpha.700' : 'mist.600'}
+                  >
                     Juz'
                   </Text>
                   <Select
-                    size={{ base: 'sm', md: 'md' }}
-                    maxWidth={{ base: '100%', md: '110px' }}
+                    w="3.25rem"
                     value={selectedJuz ?? ''}
                     onChange={handleJuzChange}
                     isDisabled={selectionLocked || isLoading || !quran}
-                    bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
-                    borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
+                    borderColor={isElite ? 'elite.300' : undefined}
                   >
                     {Array.from({ length: 30 }, (_, i) => i + 1).map((j) => (
                       <option key={j} value={j}>
@@ -2108,20 +2112,23 @@ const App = () => {
                       </option>
                     ))}
                   </Select>
-                </HStack>
+                </Box>
 
-                <HStack alignItems="center" spacing={2} flex={{ base: '1', md: 'initial' }}>
-                  <Text whiteSpace="nowrap" fontSize="sm" fontWeight="600" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
+                <Box flexShrink={0}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="600"
+                    mb={1}
+                    color={colorMode === 'dark' ? 'whiteAlpha.700' : 'mist.600'}
+                  >
                     Hizb
                   </Text>
                   <Select
-                    size={{ base: 'sm', md: 'md' }}
-                    maxWidth={{ base: '100%', md: '110px' }}
+                    w="3.25rem"
                     value={selectedHizb ?? ''}
                     onChange={handleHizbChange}
                     isDisabled={selectionLocked || isLoading || !quran}
-                    bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
-                    borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
+                    borderColor={isElite ? 'elite.300' : undefined}
                   >
                     {(quran ? getHizbsForJuz(quran, selectedJuz) : []).map((h) => (
                       <option key={h} value={h}>
@@ -2129,30 +2136,31 @@ const App = () => {
                       </option>
                     ))}
                   </Select>
-                </HStack>
+                </Box>
 
-                <HStack alignItems="center" spacing={2} flex={{ base: '1', md: 'initial' }} w={{ base: '100%', md: 'auto' }}>
-                  <Text whiteSpace="nowrap" fontSize="sm" fontWeight="600" color={colorMode === 'dark' ? 'mist.200' : 'ink.700'}>
+                <Box flex="1" minW="8.5rem" maxW={{ base: '100%', sm: '10.5rem' }}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="600"
+                    mb={1}
+                    color={colorMode === 'dark' ? 'whiteAlpha.700' : 'mist.600'}
+                  >
                     Surah
                   </Text>
                   <Select
-                    size={{ base: 'sm', md: 'md' }}
-                    maxWidth={{ base: '100%', md: '280px' }}
+                    w="100%"
                     value={selectedSurah || ''}
                     onChange={handleSurahChange}
-                    placeholder="Select a Surah"
+                    placeholder="Surah"
                     isDisabled={selectionLocked || isLoading || !selectedHizb}
                     dir="ltr"
-                    bg={colorMode === 'dark' ? 'blackAlpha.300' : 'whiteAlpha.800'}
-                    borderColor={isElite ? 'elite.300' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
-                    _hover={{ borderColor: 'ink.400' }}
+                    borderColor={isElite ? 'elite.300' : undefined}
                   >
                     {(quran && selectedHizb
                       ? getSurahsInHizb(quran, selectedHizb)
                       : []
                     ).map((surah) => (
                       <option key={surah.number} value={surah.number.toString()} dir="ltr">
-                        {/* LRI/PDI keep verse numbers left-to-right next to Arabic names */}
                         {surah.number}. {surah.name}
                         {surah.from !== surah.to
                           ? `\u2066 (${surah.from}–${surah.to})\u2069`
@@ -2160,17 +2168,20 @@ const App = () => {
                       </option>
                     ))}
                   </Select>
-                </HStack>
+                </Box>
 
                 <Checkbox
                   isChecked={stopwatchEnabled}
                   onChange={(e) => setStopwatchEnabled(e.target.checked)}
                   isDisabled={gameStarted}
                   whiteSpace="nowrap"
-                  colorScheme="teal"
+                  colorScheme="gray"
                   size="sm"
+                  alignSelf="flex-end"
+                  mb={0.5}
+                  sx={{ '.chakra-checkbox__control': { borderRadius: 'sm' } }}
                 >
-                  Enable Stopwatch
+                  Stopwatch
                 </Checkbox>
               </Flex>
 
@@ -2190,7 +2201,14 @@ const App = () => {
                           key={opt.value}
                           size="sm"
                           variant={difficulty === opt.value ? 'solid' : 'outline'}
-                          colorScheme="teal"
+                          bg={difficulty === opt.value ? 'ink.600' : undefined}
+                          color={difficulty === opt.value ? 'white' : undefined}
+                          borderColor={difficulty === opt.value ? 'ink.600' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
+                          _hover={
+                            difficulty === opt.value
+                              ? { bg: 'ink.700' }
+                              : { borderColor: 'ink.400', bg: colorMode === 'dark' ? 'whiteAlpha.100' : 'mist.50' }
+                          }
                           onClick={() => setDifficulty(opt.value)}
                           isDisabled={gameStarted}
                         >
@@ -2215,7 +2233,14 @@ const App = () => {
                           key={n}
                           size="sm"
                           variant={visibleCardCount === n ? 'solid' : 'outline'}
-                          colorScheme="teal"
+                          bg={visibleCardCount === n ? 'ink.600' : undefined}
+                          color={visibleCardCount === n ? 'white' : undefined}
+                          borderColor={visibleCardCount === n ? 'ink.600' : colorMode === 'dark' ? 'whiteAlpha.300' : 'mist.300'}
+                          _hover={
+                            visibleCardCount === n
+                              ? { bg: 'ink.700' }
+                              : { borderColor: 'ink.400', bg: colorMode === 'dark' ? 'whiteAlpha.100' : 'mist.50' }
+                          }
                           onClick={() => setVisibleCardCount(n)}
                           isDisabled={gameStarted}
                           minW="44px"
@@ -2236,7 +2261,7 @@ const App = () => {
                     <RadioGroup
                       value={attemptMode}
                       onChange={setAttemptMode}
-                      colorScheme="teal"
+                      colorScheme="gray"
                       size="sm"
                     >
                       <Stack
@@ -2259,7 +2284,7 @@ const App = () => {
                       <RadioGroup
                         value={playDirection}
                         onChange={setPlayDirection}
-                        colorScheme="teal"
+                        colorScheme="gray"
                         size="sm"
                       >
                         <Stack
@@ -2336,7 +2361,8 @@ const App = () => {
               px={{ base: 2, md: 3 }}
               w="100%"
               borderRadius="lg"
-              bg={colorMode === 'dark' ? 'blackAlpha.200' : 'whiteAlpha.500'}
+              bg={colorMode === 'dark' ? 'rgba(44, 50, 59, 0.55)' : 'rgba(255, 255, 255, 0.72)'}
+              boxShadow={colorMode === 'dark' ? 'insetSoft' : 'insetSoftLight'}
               border="1px solid"
               borderColor={
                 isElite
@@ -2376,10 +2402,10 @@ const App = () => {
               <SequenceArea cards={cards} playDirection={playDirection} isElite={isElite} />
 
               <Box
-                bg={colorMode === 'dark' ? 'rgba(34, 66, 63, 0.45)' : 'rgba(255, 255, 255, 0.45)'}
+                bg={colorMode === 'dark' ? 'rgba(44, 50, 59, 0.65)' : 'rgba(255, 255, 255, 0.75)'}
                 backdropFilter="blur(12px)"
                 borderRadius={{ base: 'lg', md: 'xl' }}
-                boxShadow="soft"
+                boxShadow={colorMode === 'dark' ? 'panel' : 'panelLight'}
                 padding={{ base: 2.5, md: 5 }}
                 w="100%"
                 border="1px solid"
@@ -2663,7 +2689,7 @@ const App = () => {
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Tabs isFitted variant="soft-rounded" colorScheme="teal" size="sm">
+            <Tabs isFitted variant="soft-rounded" colorScheme="gray" size="sm">
               <TabList
                 mb={3}
                 gap={1}

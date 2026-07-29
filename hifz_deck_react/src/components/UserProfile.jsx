@@ -58,7 +58,7 @@ const UserProfile = () => {
   const muted = isDark ? 'whiteAlpha.600' : 'mist.500';
   const headingColor = isDark ? 'mist.50' : 'ink.900';
   const borderSoft = isDark ? 'whiteAlpha.200' : 'mist.200';
-  const panelBg = isDark ? 'rgba(34, 66, 63, 0.55)' : 'rgba(255, 255, 255, 0.72)';
+  const panelBg = isDark ? 'rgba(44, 50, 59, 0.72)' : 'rgba(255, 255, 255, 0.82)';
 
   // /profile with no username → resolve to the signed-in / guest name
   useEffect(() => {
@@ -167,11 +167,11 @@ const UserProfile = () => {
       <AppBackground />
       <Container maxW="lg" py={{ base: 8, md: 12 }} position="relative" zIndex={1}>
         <Flex justify="space-between" align="center" mb={6}>
-          <Button as={RouterLink} to="/" size="sm" variant="ghost" colorScheme="teal">
+          <Button as={RouterLink} to="/" size="sm" variant="ghost" colorScheme="gray">
             ← Back to Hifzer
           </Button>
           {user && (
-            <Button as={RouterLink} to="/profile" size="sm" variant="outline" colorScheme="teal">
+            <Button as={RouterLink} to="/profile" size="sm" variant="outline" colorScheme="gray">
               My profile
             </Button>
           )}
@@ -219,7 +219,7 @@ const UserProfile = () => {
             <Text color={muted} mb={5}>
               No profile matches “{decodeURIComponent(usernameParam || '')}”.
             </Text>
-            <Button as={RouterLink} to="/" variant="outline" colorScheme="teal">
+            <Button as={RouterLink} to="/" variant="outline" colorScheme="gray">
               Back to Hifzer
             </Button>
           </Box>
@@ -233,7 +233,7 @@ const UserProfile = () => {
             <Text color={muted} mb={5}>
               Something went wrong fetching this player. Try again in a moment.
             </Text>
-            <Button as={RouterLink} to="/" variant="outline" colorScheme="teal">
+            <Button as={RouterLink} to="/" variant="outline" colorScheme="gray">
               Back to Hifzer
             </Button>
           </Box>

@@ -222,7 +222,7 @@ const AccountSettings = ({
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={4}>
-          <Tabs isFitted variant="soft-rounded" colorScheme="teal" size="sm">
+          <Tabs isFitted variant="soft-rounded" colorScheme="gray" size="sm">
             <TabList
               mb={3}
               gap={1}
@@ -266,7 +266,7 @@ const AccountSettings = ({
                         size="xs"
                         mt={2}
                         variant="outline"
-                        colorScheme="teal"
+                        colorScheme="gray"
                       >
                         View public profile
                       </Button>
@@ -438,7 +438,7 @@ const AccountSettings = ({
                       value={(Math.min(forwardCount, REVERSE_UNLOCK_COUNT) / REVERSE_UNLOCK_COUNT) * 100}
                       size="sm"
                       borderRadius="full"
-                      colorScheme="teal"
+                      colorScheme="gray"
                       bg={trackBg}
                       aria-label={`Forward completions ${Math.min(forwardCount, REVERSE_UNLOCK_COUNT)} of ${REVERSE_UNLOCK_COUNT}`}
                     />
@@ -465,7 +465,7 @@ const AccountSettings = ({
                       value={(Math.min(reverseCount, ELITE_UNLOCK_COUNT) / ELITE_UNLOCK_COUNT) * 100}
                       size="sm"
                       borderRadius="full"
-                      colorScheme={isElite ? 'yellow' : 'teal'}
+                      colorScheme={isElite ? 'yellow' : 'gray'}
                       bg={trackBg}
                       aria-label={`Reverse completions ${Math.min(reverseCount, ELITE_UNLOCK_COUNT)} of ${ELITE_UNLOCK_COUNT}`}
                     />

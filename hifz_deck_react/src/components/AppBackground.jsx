@@ -4,21 +4,19 @@ import { keyframes } from '@emotion/react'
 
 /**
  * Atmospheric page background:
- * soft mist→ink gradient + a faint geometric lattice (Islamic-inspired, very quiet).
- * One gentle opacity drift so the page feels alive without distraction.
+ * warm stone gradient + quiet geometric lattice + soft depth layers.
  */
 const drift = keyframes`
-  0% { opacity: 0.22; transform: translate3d(0, 0, 0); }
-  50% { opacity: 0.32; transform: translate3d(-1.5%, 1%, 0); }
-  100% { opacity: 0.22; transform: translate3d(0, 0, 0); }
+  0% { opacity: 0.18; transform: translate3d(0, 0, 0); }
+  50% { opacity: 0.26; transform: translate3d(-1.5%, 1%, 0); }
+  100% { opacity: 0.18; transform: translate3d(0, 0, 0); }
 `
 
 const AppBackground = () => {
   const { colorMode } = useColorMode()
   const isDark = colorMode === 'dark'
 
-  // Subtle 8-point lattice — readable as texture, not a loud pattern
-  const patternStroke = isDark ? 'rgba(201, 168, 74, 0.18)' : 'rgba(58, 125, 116, 0.14)'
+  const patternStroke = isDark ? 'rgba(201, 168, 74, 0.14)' : 'rgba(107, 119, 136, 0.12)'
   const patternSvg = encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72">
       <g fill="none" stroke="${patternStroke}" stroke-width="1">
@@ -38,33 +36,42 @@ const AppBackground = () => {
       pointerEvents="none"
       overflow="hidden"
     >
-      {/* Base gradient atmosphere */}
       <Box
         position="absolute"
         inset={0}
         bgGradient={
           isDark
-            ? 'radial(ellipse at 20% 0%, ink.800 0%, transparent 55%), radial(ellipse at 90% 20%, elite.900 0%, transparent 45%), linear(180deg, ink.900 0%, ink.800 55%, #121a1f 100%)'
-            : 'radial(ellipse at 15% -10%, ink.100 0%, transparent 50%), radial(ellipse at 100% 0%, mist.100 0%, transparent 45%), linear(165deg, mist.50 0%, #eef4f2 42%, mist.100 100%)'
+            ? 'radial(ellipse at 18% 0%, ink.800 0%, transparent 52%), radial(ellipse at 92% 12%, elite.900 0%, transparent 42%), linear(180deg, #232830 0%, ink.900 48%, #181c22 100%)'
+            : 'radial(ellipse at 12% -8%, mist.100 0%, transparent 48%), radial(ellipse at 100% 0%, #ebe7e1 0%, transparent 40%), linear(168deg, mist.50 0%, #f3f0eb 45%, mist.100 100%)'
         }
       />
 
-      {/* Soft vignette so content stays readable */}
+      {/* Warm highlight band for depth */}
+      <Box
+        position="absolute"
+        top="-20%"
+        left="10%"
+        w="55%"
+        h="45%"
+        borderRadius="full"
+        filter="blur(80px)"
+        bg={isDark ? 'rgba(201, 168, 74, 0.06)' : 'rgba(255, 255, 255, 0.55)'}
+      />
+
       <Box
         position="absolute"
         inset={0}
         bgGradient={
           isDark
-            ? 'radial(ellipse at center, transparent 40%, rgba(8,12,14,0.55) 100%)'
-            : 'radial(ellipse at center, transparent 35%, rgba(244,247,246,0.65) 100%)'
+            ? 'radial(ellipse at center, transparent 38%, rgba(12, 14, 18, 0.5) 100%)'
+            : 'radial(ellipse at center, transparent 32%, rgba(250, 249, 247, 0.55) 100%)'
         }
       />
 
-      {/* Quiet geometric lattice with a slow drift */}
       <Box
         position="absolute"
         inset="-8%"
-        opacity={isDark ? 0.28 : 0.26}
+        opacity={isDark ? 0.22 : 0.2}
         animation={`${drift} 28s ease-in-out infinite`}
         style={{
           backgroundImage: `url("data:image/svg+xml,${patternSvg}")`,

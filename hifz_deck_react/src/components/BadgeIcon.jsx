@@ -132,8 +132,8 @@ const BadgeIcon = ({ badgeId, earned = false, size = 48, animate = false }) => {
             borderRadius="md"
             fontSize="xs"
             fontWeight="600"
-            bg={earned ? (isDark ? 'teal.700' : 'teal.100') : (isDark ? 'whiteAlpha.200' : 'mist.200')}
-            color={earned ? (isDark ? 'teal.100' : 'teal.800') : (isDark ? 'whiteAlpha.700' : 'mist.600')}
+            bg={earned ? (isDark ? 'ink.700' : 'ink.100') : (isDark ? 'whiteAlpha.200' : 'mist.200')}
+            color={earned ? (isDark ? 'mist.100' : 'ink.700') : (isDark ? 'whiteAlpha.700' : 'mist.600')}
           >
             {statusLabel}
           </Badge>

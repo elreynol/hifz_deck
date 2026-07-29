@@ -11,12 +11,12 @@ const Card = ({ ayah, status = 'idle', onTap, isFaceDown, readOnly = false, isEl
 
   const getBg = () => {
     if (status === 'incorrect') return isDark ? 'red.800' : 'red.50';
-    if (status === 'correct') return isDark ? 'green.800' : 'green.50';
+    if (status === 'correct') return isDark ? 'ink.700' : 'ink.100';
     if (status === 'completed') {
       if (isElite) return isDark ? 'elite.800' : 'elite.50';
       return isDark ? 'ink.800' : 'ink.50';
     }
-    return isDark ? 'rgba(34, 66, 63, 0.72)' : 'rgba(255, 255, 255, 0.82)';
+    return isDark ? 'rgba(44, 50, 59, 0.78)' : 'rgba(255, 255, 255, 0.92)';
   };
 
   const getBorderColor = () => {
